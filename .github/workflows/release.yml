@@ -3,45 +3,20 @@ name: Publish Python package
 on:
   release:
     types: [published]
-  # TEMPORARY: bootstrap support for publishing the existing v0.1.0 tag.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing release tag to build and publish (for example, v0.1.0)
-        required: true
-        type: string
 
 jobs:
   build-distributions:
     name: Build and validate distributions
     runs-on: ubuntu-latest
-    env:
-      SOURCE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
     permissions:
       contents: read
 
     steps:
-      - name: Check out the selected release tag
+      - name: Check out the published release tag
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ env.SOURCE_TAG }}
+          ref: ${{ github.event.release.tag_name }}
           persist-credentials: false
-
-      - name: Validate selected release tag
-        shell: bash
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${GITHUB_REF}" != "refs/heads/main" ]]; then
-            echo "Manual bootstrap publication must be dispatched from the main branch." >&2
-            exit 1
-          fi
-          if [[ "${SOURCE_TAG}" != v* ]]; then
-            echo "Selected ref must be an existing release tag beginning with 'v'." >&2
-            exit 1
-          fi
-          if ! git rev-parse --verify --quiet "refs/tags/${SOURCE_TAG}^{commit}" >/dev/null; then
-            echo "Selected ref does not resolve to an existing Git tag: ${SOURCE_TAG}" >&2
-            exit 1
-          fi
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
