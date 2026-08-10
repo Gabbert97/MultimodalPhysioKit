@@ -2,6 +2,7 @@
 
 [![Python CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml)
 [![MATLAB CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/multimodalphysiokit.svg)](https://pypi.org/project/multimodalphysiokit/)
 [![DOI](https://zenodo.org/badge/1330070732.svg)](https://doi.org/10.5281/zenodo.21877145)
 
 MultimodalPhysioKit is a modular API for processing synchronized multimodal
@@ -260,11 +261,11 @@ native results.
 
 ## Installation and dependencies
 
-MultimodalPhysioKit v0.1.0 is not yet published to PyPI. Once available, the
-planned public installation command is:
+MultimodalPhysioKit v0.1.0 is available from
+[PyPI](https://pypi.org/project/multimodalphysiokit/):
 
 ```bash
-python -m pip install multimodalphysiokit
+pip install multimodalphysiokit
 ```
 
 For development from a repository checkout, run from the repository root:

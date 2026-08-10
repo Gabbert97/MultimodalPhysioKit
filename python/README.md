@@ -19,11 +19,11 @@ flow.
 
 ## Installation
 
-MultimodalPhysioKit v0.1.0 is not yet published to PyPI. Once it is available,
-the planned public installation command is:
+MultimodalPhysioKit v0.1.0 is available from
+[PyPI](https://pypi.org/project/multimodalphysiokit/):
 
 ```bash
-python -m pip install multimodalphysiokit
+pip install multimodalphysiokit
 ```
 
 For development from a repository checkout, run from the repository root:

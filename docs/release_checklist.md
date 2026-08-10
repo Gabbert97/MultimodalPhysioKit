@@ -100,9 +100,9 @@ private archive; its Git history is never transferred to the public repository.
 
 ## Post-release publication
 
-- [ ] Publish the validated Python artifacts to PyPI if desired.
-- [ ] If published, update README installation wording from planned to actual
-      PyPI availability.
+- [x] Publish the validated Python artifacts to
+      [PyPI](https://pypi.org/project/multimodalphysiokit/).
+- [x] Update README installation wording to reflect PyPI availability.
 - [ ] Connect the public repository to Zenodo and archive the release.
 - [ ] Record the resulting DOI and update `CITATION.cff` when appropriate.
 - [ ] Verify the public README, release links, citation metadata, and CI badges.
