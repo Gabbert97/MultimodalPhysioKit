@@ -2,6 +2,7 @@
 
 [![Python CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml)
 [![MATLAB CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml)
+[![DOI](https://zenodo.org/badge/1330070732.svg)](https://doi.org/10.5281/zenodo.21877145)
 
 MultimodalPhysioKit is a modular API for processing synchronized multimodal
 physiological signals in offline postprocessing and window-based real-time

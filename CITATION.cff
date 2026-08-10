@@ -3,6 +3,7 @@ message: "If you use MultimodalPhysioKit in academic work, please cite the softw
 title: "MultimodalPhysioKit"
 type: software
 version: "0.1.0"
+doi: "10.5281/zenodo.21877146"
 authors:
   - family-names: "Luzzani"
     given-names: "Gabriele"
