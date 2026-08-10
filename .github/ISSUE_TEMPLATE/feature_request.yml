@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose a focused improvement to MultimodalPhysioKit.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Describe the user need or limitation this proposal addresses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed feature
+      description: Describe the desired behavior and public interface.
+    validations:
+      required: true
+
+  - type: input
+    id: affected-area
+    attributes:
+      label: Affected modality or API
+      placeholder: "For example, ECGProcessor, Recording, or HDF5 input"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: implementation
+    attributes:
+      label: Implementation
+      options:
+        - Python
+        - MATLAB
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe existing workarounds or alternative designs.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Willingness to contribute
+      options:
+        - Yes, I can prepare a pull request
+        - Maybe, with guidance
+        - No
+    validations:
+      required: true

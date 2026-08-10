@@ -1,0 +1,96 @@
+cff-version: 1.2.0
+message: "If you use MultimodalPhysioKit in academic work, please cite the software and the relevant methodological publications listed in this file."
+title: "MultimodalPhysioKit"
+type: software
+version: "0.1.0"
+authors:
+  - family-names: "Luzzani"
+    given-names: "Gabriele"
+license: "LGPL-3.0-or-later"
+repository-code: "https://github.com/Gabbert97/MultimodalPhysioKit"
+abstract: >
+  Reusable MATLAB and Python software for multimodal physiological
+  signal processing, including a bundled mathematically generated fixture.
+  Research datasets and private validation recordings are not
+  distributed with the software.
+keywords:
+  - physiological signals
+  - multimodal analysis
+  - signal processing
+  - MATLAB
+  - Python
+references:
+  - type: article
+    authors:
+      - family-names: "Pan"
+        given-names: "Jiapu"
+      - family-names: "Tompkins"
+        given-names: "Willis J."
+    title: "A Real-Time QRS Detection Algorithm"
+    journal: "IEEE Transactions on Biomedical Engineering"
+    year: 1985
+    volume: "BME-32"
+    issue: 3
+    start: 230
+    end: 236
+    doi: "10.1109/TBME.1985.325532"
+  - type: article
+    authors:
+      - family-names: "Greco"
+        given-names: "Alberto"
+      - family-names: "Valenza"
+        given-names: "Gaetano"
+      - family-names: "Lanata"
+        given-names: "Antonio"
+      - family-names: "Scilingo"
+        given-names: "Enzo Pasquale"
+      - family-names: "Citi"
+        given-names: "Luca"
+    title: "cvxEDA: A Convex Optimization Approach to Electrodermal Activity Processing"
+    journal: "IEEE Transactions on Biomedical Engineering"
+    year: 2016
+    volume: 63
+    issue: 4
+    start: 797
+    end: 804
+    doi: "10.1109/TBME.2015.2474131"
+  - type: article
+    authors:
+      - family-names: "Luzzani"
+        given-names: "G."
+      - family-names: "Buraioli"
+        given-names: "I."
+      - family-names: "Guglieri"
+        given-names: "G."
+      - family-names: "Demarchi"
+        given-names: "D."
+    title: "EDA, PPG and Skin Temperature as Predictive Signals for Mental Failure by a Statistical Analysis on Stress and Mental Workload"
+    journal: "IEEE Open Journal of Engineering in Medicine and Biology"
+    year: 2025
+    volume: 6
+    start: 248
+    end: 255
+    doi: "10.1109/OJEMB.2024.3515473"
+  - type: article
+    authors:
+      - family-names: "Luzzani"
+        given-names: "G."
+      - family-names: "Pogliano"
+        given-names: "M."
+      - family-names: "Buraioli"
+        given-names: "I."
+      - family-names: "Colavincenzo"
+        given-names: "M."
+      - family-names: "Martorana"
+        given-names: "S."
+      - family-names: "Guglieri"
+        given-names: "G."
+      - family-names: "Demarchi"
+        given-names: "D."
+    title: "ECG, Respiration, fNIRS, and Eye Tracking for Stress and Mental Workload Monitoring in Human-Machine Interaction"
+    journal: "IEEE Access"
+    year: 2025
+    volume: 13
+    start: 122726
+    end: 122741
+    doi: "10.1109/ACCESS.2025.3588384"

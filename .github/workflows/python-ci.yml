@@ -1,0 +1,131 @@
+name: Python CI
+
+on:
+  push:
+    branches:
+      - main
+      - public-release-v0.1
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "python[test]"
+
+      - name: Run Python tests
+        run: python -m pytest python/tests -v
+
+  package-build:
+    name: Build and validate distributions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build and validation tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m pip install -e python
+
+      - name: Verify license copies
+        run: |
+          cmp LICENSE python/LICENSE
+          cmp COPYING python/COPYING
+          cmp COPYING.LESSER python/COPYING.LESSER
+
+      - name: Verify synthetic fixture reproducibility
+        run: python tools/generate_synthetic_sample.py --check
+
+      - name: Build sdist and wheel
+        run: python -m build python --outdir dist
+
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Inspect distribution artifacts
+        run: |
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+          python -m zipfile -l dist/*.whl
+          tar -tzf dist/*.tar.gz
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  installed-package-tests:
+    name: Test installed wheel
+    runs-on: ubuntu-latest
+    needs: package-build
+
+    steps:
+      - name: Check out repository tests
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: ${{ runner.temp }}/python-distributions
+
+      - name: Install built wheel
+        run: |
+          python -m pip install --upgrade pip
+          wheel="$(find "${{ runner.temp }}/python-distributions" -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          python -m pip install "$wheel" "pytest>=7.4"
+
+      - name: Verify installed import and version
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -I -c 'import importlib.metadata as metadata, os;
+          from pathlib import Path; import multimodalphysiokit as package;
+          assert package.__version__ == metadata.version("multimodalphysiokit");
+          assert not Path(package.__file__).resolve().is_relative_to(Path(os.environ["GITHUB_WORKSPACE"]).resolve());
+          print(package.__file__); print(package.__version__)'
+
+      - name: Run tests against installed distribution
+        working-directory: ${{ runner.temp }}
+        run: python -m pytest "$GITHUB_WORKSPACE/python/tests" -v

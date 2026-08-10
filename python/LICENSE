@@ -1,0 +1,25 @@
+SPDX-License-Identifier: LGPL-3.0-or-later
+
+MultimodalPhysioKit License Summary
+
+Copyright (C) 2026 Gabriele Luzzani
+
+MultimodalPhysioKit is licensed under the GNU Lesser General Public License
+version 3.0 or later (LGPL-3.0-or-later).
+
+This means the toolkit may be used as a library in larger projects under the
+terms of the LGPL, while modifications to the LGPL-covered MultimodalPhysioKit
+toolkit itself remain subject to LGPL terms.
+
+MultimodalPhysioKit is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License
+and the GNU General Public License for more details.
+
+The full license texts are provided in:
+
+- COPYING        GNU General Public License version 3
+- COPYING.LESSER GNU Lesser General Public License version 3
+
+Third-party dependencies are not bundled unless explicitly stated and remain
+subject to their own licenses and citation requirements.

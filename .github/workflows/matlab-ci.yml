@@ -1,0 +1,35 @@
+name: MATLAB CI
+
+on:
+  push:
+    branches:
+      - main
+      - public-release-v0.1
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  matlab-tests:
+    name: MATLAB R2025b tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MATLAB and required toolboxes
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2025b
+          products: >-
+            Signal_Processing_Toolbox
+            Statistics_and_Machine_Learning_Toolbox
+
+      - name: Run MATLAB test suite
+        uses: matlab-actions/run-command@v3
+        with:
+          command: run("matlab/tests/run_matlab_tests.m")

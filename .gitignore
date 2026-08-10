@@ -1,0 +1,143 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Editors and local workspace settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MATLAB
+*.asv
+*.autosave
+*.m~
+*.mlx~
+*.slxc
+*.slxc.*
+*.mex*
+*.p
+codegen/
+slprj/
+sccprj/
+*.prj.user
+*.mlproj.user
+
+# Python bytecode, environments, and tooling
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+.Python
+.venv/
+venv/
+env/
+ENV/
+.envrc
+build/
+dist/
+downloads/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+!examples/python/*.ipynb
+!examples/cross_language_validation/*.ipynb
+
+# Data and local datasets
+data/
+dataset/
+datasets/
+raw_data/
+raw-data/
+processed_data/
+processed-data/
+external_data/
+external-data/
+interim_data/
+interim-data/
+*.mat
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.parquet
+
+# Public example sample data
+!examples/sample_data/
+!examples/sample_data/README.md
+!examples/sample_data/synthetic_multimodal_180s.hdf5
+
+# Generated results, reports, and figures
+results/
+result/
+outputs/
+output/
+artifacts/
+generated/
+reports/
+figures/
+plots/
+*.fig
+
+# Logs, caches, and temporary files
+logs/
+*.log
+cache/
+.cache/
+tmp/
+temp/
+*.tmp
+
+# Private files, credentials, and local configuration
+private/
+secrets/
+credentials/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+local_config.*
+config.local.*
+
+# External dependencies
+external/
+
+# Optional local cvxEDA checkout
+external/cvxEDA/
+
+# Local MATLAB toolboxes
+toolboxes/
+
+# Local datasets
+data/
+raw_data/
+processed_data/
+results/
+figures/
+local_validation/
+validation-output/
+*.egg-info

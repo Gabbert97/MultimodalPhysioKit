@@ -1,0 +1,105 @@
+name: Bug report
+description: Report reproducible incorrect behavior in MultimodalPhysioKit.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Do not include private recordings,
+        identifying information, credentials, or restricted dataset details.
+
+  - type: input
+    id: package-version
+    attributes:
+      label: MultimodalPhysioKit version
+      placeholder: "0.1.0 or commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: implementation
+    attributes:
+      label: Implementation
+      options:
+        - Python
+        - MATLAB
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: language-version
+    attributes:
+      label: Python or MATLAB version
+      placeholder: "Python 3.12 or MATLAB R2025b"
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04, macOS, or Windows 11"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modality
+    attributes:
+      label: Modality or component
+      options:
+        - ECG
+        - EDA
+        - Respiration
+        - Temperature
+        - fNIRS
+        - Data model
+        - HDF5 input
+        - Packaging or installation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: sampling-frequency
+    attributes:
+      label: Sampling frequency, if relevant
+      placeholder: "For example, 100 Hz"
+
+  - type: textarea
+    id: reproducible-example
+    attributes:
+      label: Minimal reproducible example
+      description: Use synthetic or non-sensitive inputs only.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-message
+    attributes:
+      label: Traceback or error message
+      description: Remove credentials, local paths, and sensitive data before posting.
+      render: shell
+
+  - type: checkboxes
+    id: sensitive-data
+    attributes:
+      label: Sensitive-data check
+      options:
+        - label: I have removed private data, credentials, and identifying information.
+          required: true
