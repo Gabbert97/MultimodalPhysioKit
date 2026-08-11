@@ -57,6 +57,8 @@ Open:
   it, and runs `RespirationProcessor`.
 - [Temperature example](python/temperature_example.ipynb): loads `temp`, plots
   it, and demonstrates direct and phase processing.
+- [fNIRS example](python/fnirs_example.ipynb): loads the red and infrared
+  currents, reuses a baseline, and processes two task phases independently.
 - [Multimodal example](python/multimodal_example.ipynb): reuses one temporal
   phase definition across all bundled modalities, processes each modality,
   and displays every scalar feature in a modality/phase table.
