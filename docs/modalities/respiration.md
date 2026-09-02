@@ -8,7 +8,22 @@ from multimodalphysiokit.processors import RespirationProcessor
 result = RespirationProcessor().process(respiration_signal)
 ```
 
-`RespirationProcessor()` has no constructor parameters.
+The accepted peak-to-peak breathing-rate range is configurable:
+
+```python
+processor = RespirationProcessor(
+    min_breathing_rate=3.0,
+    max_breathing_rate=30.0,
+)
+result = processor.process(respiration_signal)
+```
+
+`min_breathing_rate` and `max_breathing_rate` are expressed in breaths per
+minute and define an inclusive acceptance range. They must be finite,
+`min_breathing_rate` must be greater than zero, and
+`max_breathing_rate` must be greater than `min_breathing_rate`. The defaults
+remain 5.0 and 30.0 breaths/minute, preserving the behavior of version 0.1.0.
+
 `process(signal, *, show_plots=False, save_plots=False, output_dir=None)`
 analyzes exactly one supplied signal.
 
@@ -54,9 +69,10 @@ Detected extrema must correspond to physiological breath cycles. Motion,
 belt shifts, apnea, sighs, and irregular breathing can affect pairing.
 Relative amplitude is not absolute ventilation without calibration.
 
-The 5-30 breaths-per-minute acceptance range used by the current processor is
-a project screening choice. Users should review it for their population and
-protocol.
+The default 5-30 breaths-per-minute acceptance range is a screening choice.
+Users should review it for their population and protocol and may configure the
+range through `RespirationProcessor` without changing filtering, extrema
+detection, morphology validation, or feature formulas.
 
 ## Methodological references
 

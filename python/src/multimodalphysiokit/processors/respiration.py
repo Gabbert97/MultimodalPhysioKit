@@ -30,10 +30,27 @@ _FEATURE_NAMES = (
 
 
 class RespirationProcessor:
-    """Thin object-oriented wrapper for respiration processing."""
+    """Thin object-oriented wrapper for respiration processing.
 
-    def __init__(self) -> None:
-        pass
+    Parameters
+    ----------
+    min_breathing_rate
+        Minimum accepted peak-to-peak breathing rate in breaths per minute.
+    max_breathing_rate
+        Maximum accepted peak-to-peak breathing rate in breaths per minute.
+
+    The default 5--30 breaths-per-minute range preserves the behavior of
+    MultimodalPhysioKit 0.1.0.
+    """
+
+    def __init__(
+        self,
+        min_breathing_rate: float = 5.0,
+        max_breathing_rate: float = 30.0,
+    ) -> None:
+        self.min_breathing_rate, self.max_breathing_rate = (
+            _validate_breathing_rate_range(min_breathing_rate, max_breathing_rate)
+        )
 
     def extract_features(
         self,
@@ -64,6 +81,8 @@ class RespirationProcessor:
 
         return process_respiration(
             signal,
+            min_breathing_rate=self.min_breathing_rate,
+            max_breathing_rate=self.max_breathing_rate,
             show_plots=show_plots,
             save_plots=save_plots,
             output_dir=output_dir,
@@ -72,11 +91,19 @@ class RespirationProcessor:
 def process_respiration(
     signal: Signal,
     *,
+    min_breathing_rate: float = 5.0,
+    max_breathing_rate: float = 30.0,
     show_plots: bool = False,
     save_plots: bool = False,
     output_dir: str | Path | None = None,
 ) -> ProcessingResult:
-    """Extract MATLAB-compatible features from one respiration signal."""
+    """Extract MATLAB-compatible features from one respiration signal.
+
+    ``min_breathing_rate`` and ``max_breathing_rate`` define the inclusive
+    acceptance range for peak-to-peak rates after the existing detection and
+    morphology-validation stages. Their defaults preserve the original
+    5--30 breaths-per-minute behavior.
+    """
 
     if not isinstance(signal, Signal):
         raise TypeError("signal must be a Signal instance")
@@ -86,6 +113,9 @@ def process_respiration(
         raise TypeError("save_plots must be a boolean")
     if save_plots and output_dir is None:
         raise ValueError("output_dir must be provided when save_plots=True")
+    min_breathing_rate, max_breathing_rate = _validate_breathing_rate_range(
+        min_breathing_rate, max_breathing_rate
+    )
 
     _validate_signal(signal)
     downsample_factor = _validate_sampling_frequency(signal.sampling_frequency)
@@ -95,6 +125,8 @@ def process_respiration(
     feature_values, plot_record = _extract_respiration_features(
         filtered_signal,
         time_downsampled,
+        min_breathing_rate,
+        max_breathing_rate,
     )
     features = dict(feature_values)
 
@@ -139,6 +171,19 @@ def _validate_sampling_frequency(sampling_frequency: float) -> int:
     return int(round(ratio))
 
 
+def _validate_breathing_rate_range(
+    min_breathing_rate: float,
+    max_breathing_rate: float,
+) -> tuple[float, float]:
+    min_rate = float(min_breathing_rate)
+    max_rate = float(max_breathing_rate)
+    if not np.isfinite(min_rate) or min_rate <= 0:
+        raise ValueError("min_breathing_rate must be greater than 0")
+    if not np.isfinite(max_rate) or max_rate <= min_rate:
+        raise ValueError("max_breathing_rate must be greater than min_breathing_rate")
+    return min_rate, max_rate
+
+
 def _filter_respiration_signal(signal: np.ndarray) -> np.ndarray:
     b, a = butter(4, 1.1 / (_FS_NEW / 2), btype="low")
     try:
@@ -177,6 +222,8 @@ def _find_peaks_respiration(signal: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 def _extract_respiration_features(
     filtered_phase: np.ndarray,
     phase_time: np.ndarray,
+    min_breathing_rate: float = 5.0,
+    max_breathing_rate: float = 30.0,
 ) -> tuple[Mapping[str, float], tuple[np.ndarray, np.ndarray]]:
     i_min, i_max = _find_peaks_respiration(filtered_phase)
     if i_min.size < 3 or i_max.size < 2:
@@ -200,6 +247,8 @@ def _extract_respiration_features(
         phase_time,
         i_min_def,
         i_max_def,
+        min_breathing_rate,
+        max_breathing_rate,
     )
     return feature_values, (i_min_def, i_max_def)
 
@@ -296,10 +345,15 @@ def _features_from_breath_points(
     phase_time: np.ndarray,
     i_min_def: np.ndarray,
     i_max_def: np.ndarray,
+    min_breathing_rate: float = 5.0,
+    max_breathing_rate: float = 30.0,
 ) -> Mapping[str, float]:
     diff_t_max = np.diff(phase_time[i_max_def])
     respiration_rate = 60 / diff_t_max
-    indexes_rr_ok = np.flatnonzero((respiration_rate >= 5) & (respiration_rate <= 30))
+    indexes_rr_ok = np.flatnonzero(
+        (respiration_rate >= min_breathing_rate)
+        & (respiration_rate <= max_breathing_rate)
+    )
     if indexes_rr_ok.size < 2:
         raise ValueError("too few valid breaths detected")
 

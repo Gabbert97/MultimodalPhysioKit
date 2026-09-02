@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use MultimodalPhysioKit in academic work, please cite the software and the relevant methodological publications listed in this file."
 title: "MultimodalPhysioKit"
 type: software
-version: "0.1.0"
+version: "0.2.0"
 doi: "10.5281/zenodo.21877146"
 authors:
   - family-names: "Luzzani"

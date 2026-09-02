@@ -23,6 +23,77 @@ def test_respiration_processor_can_be_constructed_without_signal():
     assert isinstance(RespirationProcessor(), RespirationProcessor)
 
 
+def test_default_breathing_rate_range_preserves_existing_behavior():
+    processor = RespirationProcessor()
+
+    assert processor.min_breathing_rate == 5.0
+    assert processor.max_breathing_rate == 30.0
+
+
+@pytest.mark.parametrize(
+    "minimum, maximum, message",
+    [
+        (0, 30, "min_breathing_rate"),
+        (-1, 30, "min_breathing_rate"),
+        (np.nan, 30, "min_breathing_rate"),
+        (5, 5, "max_breathing_rate"),
+        (30, 5, "max_breathing_rate"),
+        (5, np.inf, "max_breathing_rate"),
+    ],
+)
+def test_invalid_breathing_rate_range_is_rejected(minimum, maximum, message):
+    with pytest.raises(ValueError, match=message):
+        RespirationProcessor(minimum, maximum)
+
+
+def test_custom_breathing_rate_range_is_forwarded_to_processing(monkeypatch):
+    observed = {}
+
+    def fake_process(signal, **kwargs):
+        observed.update(kwargs)
+        return ProcessingResult("respiration", "fake", {}, ["respiration"])
+
+    monkeypatch.setattr(
+        "multimodalphysiokit.processors.respiration.process_respiration",
+        fake_process,
+    )
+    processor = RespirationProcessor(min_breathing_rate=3, max_breathing_rate=30)
+    processor.process(make_respiration_signal())
+
+    assert observed["min_breathing_rate"] == 3.0
+    assert observed["max_breathing_rate"] == 30.0
+
+
+def test_three_to_thirty_range_accepts_coherent_slow_respiration():
+    sampling_frequency = 200
+    duration_seconds = 180
+    time = np.arange(0, duration_seconds, 1 / sampling_frequency)
+    signal = Signal(
+        np.sin(2 * np.pi * (4.4 / 60) * time),
+        time,
+        sampling_frequency,
+        label="respiration",
+    )
+
+    with pytest.raises(ValueError, match="too few valid breaths detected"):
+        RespirationProcessor().process(signal)
+
+    result = RespirationProcessor(
+        min_breathing_rate=3.0,
+        max_breathing_rate=30.0,
+    ).process(signal)
+
+    assert result.features["respiration_breath_rate_mean"] == pytest.approx(
+        4.4, rel=1e-4
+    )
+    functional_result = process_respiration(
+        signal,
+        min_breathing_rate=3.0,
+        max_breathing_rate=30.0,
+    )
+    assert functional_result.features == result.features
+
+
 def test_process_signal_returns_processing_result():
     result = RespirationProcessor().process(make_respiration_signal())
 

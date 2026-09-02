@@ -6,6 +6,14 @@ Notable changes to MultimodalPhysioKit are documented in this file.
 
 _No unreleased changes yet._
 
+## [0.2.0]
+
+### Added
+
+- Configurable minimum and maximum accepted breathing rates for the Python
+  `RespirationProcessor` and `process_respiration` APIs. Defaults remain 5 and
+  30 breaths/minute to preserve version 0.1.0 behavior.
+
 ## [0.1.0]
 
 ### Added
