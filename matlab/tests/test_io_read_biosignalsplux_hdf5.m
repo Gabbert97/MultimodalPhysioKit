@@ -31,6 +31,7 @@ verifyFalse(testCase,isfield(recording.Metadata,'FilePath'))
 verifyTrue(testCase,recording.hasSignal('ecg'))
 verifyTrue(testCase,recording.hasSignal('eda'))
 verifyTrue(testCase,recording.hasSignal('temp'))
+verifyTrue(testCase,recording.hasSignal('ppg'))
 verifyTrue(testCase,recording.hasSignal('fnirs_red'))
 verifyTrue(testCase,recording.hasSignal('fnirs_infrared'))
 verifyTrue(testCase,recording.hasSignal('rip') || ...
@@ -39,6 +40,7 @@ verifyTrue(testCase,recording.hasSignal('rip') || ...
 localVerifySignal(testCase,recording.getSignal('ecg'),'ecg','mV')
 localVerifySignal(testCase,recording.getSignal('eda'),'eda','uS')
 localVerifySignal(testCase,recording.getSignal('temp'),'temp','degC')
+localVerifySignal(testCase,recording.getSignal('ppg'),'ppg','percent full scale')
 localVerifySignal(testCase,recording.getSignal('fnirs_red'), ...
     'fnirs_red','uA')
 localVerifySignal(testCase,recording.getSignal('fnirs_infrared'), ...
@@ -64,6 +66,13 @@ function testNominalNtcResistanceReads25DegreesCelsius(testCase)
 % whose Steinhart-Hart coefficients give 298.15 K = 25 degC.
 converted = signal_conversion(32768*ones(3,1),{'TEMP'},[1 16]);
 verifyEqual(testCase,converted.temp,25*ones(3,1),'AbsTol',1e-3)
+end
+
+function testBvpIsPercentOfFullScaleCentredAtMidScale(testCase)
+% BVP is PLUX's PPG sensor; PPG has no standard physical unit:
+% 0 -> -50 %, 2^15 -> 0 %, 2^16 -> +50 % of full scale.
+converted = signal_conversion([0; 32768; 65536],{'BVP'},[1 16]);
+verifyEqual(testCase,converted.ppg,[-50; 0; 50],'AbsTol',1e-12)
 end
 
 function testUsesFnirsColumnOrder(testCase)

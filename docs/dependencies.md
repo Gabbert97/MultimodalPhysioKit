@@ -27,6 +27,16 @@ dependencies and are not declared as core package requirements.
 python -m pip install jupyter pandas
 ```
 
+## Validation script dependencies
+
+`examples/ppg_maus_validation/validate_ppg_maus.py` compares the PPG processor
+with NeuroKit2 on the public MAUS dataset. It needs NeuroKit2 (tested with
+0.3.0) and pandas, which are not package requirements:
+
+```bash
+python -m pip install neurokit2==0.3.0 pandas
+```
+
 ## Testing dependencies
 
 The declared `test` extra installs pytest:

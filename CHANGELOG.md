@@ -2,9 +2,33 @@
 
 Notable changes to MultimodalPhysioKit are documented in this file.
 
-## [Unreleased]
+## [0.3.0]
 
 All changes below apply to both Python and MATLAB unless stated otherwise.
+
+### Added
+
+- PPG processor (`PPGProcessor`, `process_ppg`, `detect_ppg_pulses` in
+  Python; `mpk.PPGProcessor` and `matlab/ppg/ppg_signal_processing.m` in
+  MATLAB). Locates beats on a 0.5-3.0 Hz band-passed copy, ignoring shallow
+  troughs so the dicrotic notch does not split a pulse; measures all pulse
+  characteristics on a 0.5-8 Hz band-passed (cleaned) copy; takes as
+  systolic peak the first local maximum reaching 70 % of the pulse's highest
+  one; measures IBIs between systolic peaks; screens pulse shape/duration
+  against a running median with a configurable `max_peak_position` (default
+  0.5); and returns pulse amplitude/duration/rise-time, BPM, pNN50, and
+  optional HRV frequency features (`label_frequency_analysis=None` skips
+  frequency analysis for short real-time windows). Requires a sampling rate
+  above 16 Hz. Validated on the public MAUS dataset against ECG and
+  NeuroKit2 (`examples/ppg_maus_validation/`). See `docs/modalities/ppg.md`.
+- BioSignalsPlux reader: a PLUX BVP channel is returned as the `ppg` signal
+  in percent of ADC full scale (Python `read_biosignalsplux_hdf5`, MATLAB
+  `mpk.io.readBioSignalsPluxHdf5`).
+- The bundled synthetic fixture gains a PPG (BVP) channel 5, one pulse per
+  synthetic ECG beat (generator v2); all other channels are bit-identical.
+  New PPG examples (`examples/python/ppg_example.ipynb`,
+  `examples/matlab/ppg_example.m`); the multimodal examples and the
+  MATLAB/Python cross-language validation now include PPG.
 
 ### Fixed
 

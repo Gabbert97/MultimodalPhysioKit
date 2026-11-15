@@ -141,3 +141,6 @@ figures/
 local_validation/
 validation-output/
 *.egg-info
+
+# Local Claude Code instructions
+CLAUDE.md

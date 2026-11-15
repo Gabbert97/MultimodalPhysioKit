@@ -27,6 +27,14 @@ Private recordings and derived comparisons remain outside the public
 repository. They are not required by package installation or public tests.
 See [Local validation](local_validation.md).
 
+## Public-dataset validation
+
+`examples/ppg_maus_validation/validate_ppg_maus.py` validates the PPG
+processor on the public MAUS dataset against ECG R-peaks and NeuroKit2. The
+dataset is not bundled; results are written to the git-ignored
+`validation-output/`. The summary tables are in
+[PPG](modalities/ppg.md#validation-on-maus).
+
 ## MATLAB tests
 
 When MATLAB and required toolboxes are available:

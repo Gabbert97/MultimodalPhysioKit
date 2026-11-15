@@ -1,5 +1,9 @@
 # MultimodalPhysioKit Python guide
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Gabbert97/MultimodalPhysioKit/main/docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
+</p>
+
 MultimodalPhysioKit's Python processing layer is input-agnostic. Standardized
 `Signal` objects flow into reusable modality processors and produce
 `ProcessingResult` objects:
@@ -19,7 +23,7 @@ flow.
 
 ## Installation
 
-MultimodalPhysioKit v0.1.0 is available from
+MultimodalPhysioKit is available from
 [PyPI](https://pypi.org/project/multimodalphysiokit/):
 
 ```bash
@@ -281,6 +285,17 @@ from multimodalphysiokit.processors import TemperatureProcessor
 
 processor = TemperatureProcessor()
 result = processor.process(temperature_signal)
+```
+
+For a completed real-time PPG window (shorter than the 60 s needed by HRV
+frequency analysis):
+
+```python
+from multimodalphysiokit.processors import PPGProcessor
+
+processor = PPGProcessor(label_frequency_analysis=None)
+result = processor.process(ppg_window)
+result.features["ppg_bpm_mean"], result.metadata["n_valid_pulses"]
 ```
 
 For paired inputs:
@@ -564,6 +579,7 @@ seconds from each temporal end. Result metadata includes `baseline_mode`,
 - [EDA](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/eda.md)
 - [Respiration](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/respiration.md)
 - [Temperature](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/temperature.md)
+- [PPG](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/ppg.md)
 - [fNIRS](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/fnirs.md)
 
 ## Example notebooks

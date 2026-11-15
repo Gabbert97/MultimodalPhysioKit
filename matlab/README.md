@@ -1,7 +1,11 @@
 # MultimodalPhysioKit for MATLAB
 
+<p align="center">
+  <img src="../docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
+</p>
+
 The MATLAB implementation exposes the `mpk` package, input adapters, plotting
-utilities, and processors for ECG, EDA, respiration, temperature, and fNIRS.
+utilities, and processors for ECG, EDA, respiration, temperature, PPG, and fNIRS.
 
 ## Setup
 
@@ -129,7 +133,7 @@ implementations in the modality directories. In particular,
 and EDA plotting occurs only when explicitly requested for a processing call.
 
 The [`examples/matlab`](../examples/matlab) directory contains minimal scripts
-for temperature, respiration, EDA, ECG, fNIRS, and multimodal processing. Run
+for temperature, respiration, EDA, ECG, PPG, fNIRS, and multimodal processing. Run
 or edit these direct workflows; customize `dataFile`, `phaseIntervals`,
 `phaseLabels`, and processor configuration in the script. The examples expose
 native `ProcessingResult` objects and do not add wrapper configuration or

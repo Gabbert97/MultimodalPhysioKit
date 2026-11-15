@@ -3,6 +3,7 @@
 from .ecg import ECGProcessor, detect_ecg_r_peaks, process_ecg
 from .eda import EDAProcessor, process_eda
 from .fnirs import FNIRSProcessor, process_fnirs
+from .ppg import PPGProcessor, detect_ppg_pulses, process_ppg
 from .respiration import RespirationProcessor, process_respiration
 from .temperature import TemperatureProcessor, process_temperature
 
@@ -10,12 +11,15 @@ __all__ = [
     "ECGProcessor",
     "EDAProcessor",
     "FNIRSProcessor",
+    "PPGProcessor",
     "RespirationProcessor",
     "TemperatureProcessor",
     "detect_ecg_r_peaks",
+    "detect_ppg_pulses",
     "process_ecg",
     "process_eda",
     "process_fnirs",
+    "process_ppg",
     "process_respiration",
     "process_temperature",
 ]

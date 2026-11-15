@@ -91,6 +91,11 @@ temperatureProcessor.ShowPlots = false;
 output.temperature = localProcessSingleSignal( ...
     recording,temperatureProcessor,'temp',phaseLabels);
 
+ppgProcessor = mpk.PPGProcessor('LabelFrequencyAnalysis',1);
+ppgProcessor.ShowPlots = false;
+output.ppg = localProcessSingleSignal( ...
+    recording,ppgProcessor,'ppg',phaseLabels);
+
 fnirsProcessor = mpk.FNIRSProcessor('AgeYears',25);
 baselineRed = recording.extractPhase('fnirs_red','phase_1');
 baselineInfrared = recording.extractPhase('fnirs_infrared','phase_1');

@@ -15,6 +15,7 @@ _UNITS = {
     "eda": "uS",
     "temp": "degC",
     "rip": "percent full scale",
+    "ppg": "percent full scale",
     "respiration": "V",
     "fnirs_red": "uA",
     "fnirs_infrared": "uA",
@@ -189,6 +190,8 @@ def _canonical_sensor(sensor_label: str) -> str | None:
         return "RIP"
     if sensor_label.lower() == "respiration":
         return "RESPIRATION"
+    if sensor_label.lower() == "bvp":
+        return "BVP"
     if sensor_label.lower() == "hspo2":
         return "hSpO2"
     return None
@@ -201,6 +204,7 @@ def _signal_name(canonical_sensor: str) -> str | None:
         "TEMP": "temp",
         "RIP": "rip",
         "RESPIRATION": "respiration",
+        "BVP": "ppg",
     }.get(canonical_sensor)
 
 
@@ -231,7 +235,9 @@ def _convert_biosignalsplux_channel(
         ntc_ohm = (ntc_v * 1e4) / (vcc - ntc_v)
         tmp_k = 1.0 / (a0 + a1 * np.log(ntc_ohm) + a2 * np.log(ntc_ohm) ** 3)
         return tmp_k - 273.15
-    if canonical_sensor == "RIP":
+    if canonical_sensor in ("RIP", "BVP"):
+        # Percent of ADC full scale, centred at mid-scale (BVP = PLUX PPG sensor;
+        # PPG amplitude has no standard physical unit).
         return (raw / denominator - 0.5) * 100
     if canonical_sensor == "EDA":
         return raw * vcc / (0.12 * denominator)
