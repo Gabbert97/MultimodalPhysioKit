@@ -564,6 +564,7 @@ seconds from each temporal end. Result metadata includes `baseline_mode`,
 - [EDA](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/eda.md)
 - [Respiration](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/respiration.md)
 - [Temperature](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/temperature.md)
+- [PPG](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/ppg.md)
 - [fNIRS](https://github.com/Gabbert97/MultimodalPhysioKit/blob/main/docs/modalities/fnirs.md)
 
 ## Example notebooks

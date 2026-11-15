@@ -248,6 +248,7 @@ as sample-by-sample causal streaming implementations.
 - [EDA](docs/modalities/eda.md)
 - [Respiration](docs/modalities/respiration.md)
 - [Temperature](docs/modalities/temperature.md)
+- [PPG](docs/modalities/ppg.md)
 - [fNIRS](docs/modalities/fnirs.md)
 
 ## Examples

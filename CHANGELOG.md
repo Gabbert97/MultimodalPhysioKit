@@ -6,6 +6,18 @@ Notable changes to MultimodalPhysioKit are documented in this file.
 
 All changes below apply to both Python and MATLAB unless stated otherwise.
 
+### Added
+
+- PPG processor (`PPGProcessor`, `process_ppg`, `detect_ppg_pulses` in
+  Python; `mpk.PPGProcessor` and `matlab/ppg/ppg_signal_processing.m` in
+  MATLAB). Detects pulse feet and systolic peaks on a 0.5-3.0 Hz band-passed
+  copy, measures all pulse characteristics on a drift-free cleaned copy
+  (0.5 Hz high-pass), screens pulse shape/duration against a running median,
+  and returns
+  pulse amplitude/duration/rise-time, BPM, pNN50, and optional HRV frequency
+  features (`label_frequency_analysis=None` skips frequency analysis for
+  short real-time windows). See `docs/modalities/ppg.md`.
+
 ### Fixed
 
 - ECG `ecg_pnn50` / `ecg_pnn50_max`: after a rejected inter-beat interval,
