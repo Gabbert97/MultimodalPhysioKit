@@ -13,6 +13,8 @@ from scipy.signal import butter, filtfilt
 
 from multimodalphysiokit.core import ProcessingResult, Signal
 
+from ._downsampling import antialias_downsample
+
 
 _FS_NEW = 100
 _DEFAULT_MINIMUM_SCR_AMPLITUDE = 0.01
@@ -78,7 +80,7 @@ class EDAProcessor:
 
         _validate_signal(signal)
         down = int(round(signal.sampling_frequency / _FS_NEW))
-        eda_downsampled = signal.samples[::down].copy()
+        eda_downsampled = antialias_downsample(signal.samples, down, _FS_NEW)
         time_downsampled = signal.time[::down].copy()
 
         return {
@@ -118,7 +120,11 @@ class EDAProcessor:
         plot_output_label = self.output_label if output_label is None else output_label
         filtered = self.filter_signal(signal)
         eda_filtered = np.asarray(filtered["eda_filtered"], dtype=float)
-        cache_path = self._cache_path(signal)
+        cvxeda_callable = _resolve_cvxeda_callable(
+            decomposition_callable=self.decomposition_callable,
+            cvxeda_path=self.cvxeda_path,
+        )
+        cache_path = self._cache_path(signal, cvxeda_callable)
         if cache_path is not None:
             cached = _load_decomposition_cache(cache_path)
             if cached is not None:
@@ -139,10 +145,6 @@ class EDAProcessor:
                 )
                 return result
 
-        cvxeda_callable = _resolve_cvxeda_callable(
-            decomposition_callable=self.decomposition_callable,
-            cvxeda_path=self.cvxeda_path,
-        )
         sampling_frequency = float(filtered["sampling_frequency"])
         if self.decomposition_callable is not None:
             output = list(cvxeda_callable(eda_filtered, 1 / sampling_frequency))
@@ -246,13 +248,20 @@ class EDAProcessor:
             },
         )
 
-    def _cache_path(self, signal: Signal) -> Path | None:
+    def _cache_path(self, signal: Signal, cvxeda_callable: Callable) -> Path | None:
         if self.cache_directory is None:
             return None
         digest = hashlib.sha256()
         digest.update(np.asarray(signal.samples).tobytes())
         digest.update(np.asarray(signal.time).tobytes())
         digest.update(np.asarray([signal.sampling_frequency], dtype=float).tobytes())
+        digest.update(
+            _decomposition_identity(
+                cvxeda_callable,
+                decomposition_callable=self.decomposition_callable,
+                cvxeda_path=self.cvxeda_path,
+            ).encode()
+        )
         return self.cache_directory / f"{self.output_label}_{digest.hexdigest()[:16]}_decomposition.npz"
 
 
@@ -344,6 +353,33 @@ def _validate_signal(signal: Signal) -> None:
         raise ValueError("EDA signal is too short")
     if float(signal.time[-1] - signal.time[0]) <= 0:
         raise ValueError("EDA signal duration must be positive")
+
+
+def _decomposition_identity(
+    cvxeda_callable: Callable,
+    *,
+    decomposition_callable: Callable | None,
+    cvxeda_path: Path | None,
+) -> str:
+    """Describe the decomposition so caches are never shared across sources."""
+
+    parameters = repr(sorted(_CVXEDA_PARAMETERS.items()))
+    if decomposition_callable is not None:
+        module = getattr(cvxeda_callable, "__module__", "")
+        name = getattr(cvxeda_callable, "__qualname__", type(cvxeda_callable).__qualname__)
+        return f"callable:{module}.{name}|{parameters}"
+
+    source_file = cvxeda_path
+    if source_file is None:
+        source_file = getattr(importlib.import_module(cvxeda_callable.__module__), "__file__", None)
+    else:
+        source_file = source_file / "cvxEDA.py" if source_file.is_dir() else source_file
+    if source_file is not None and Path(source_file).is_file():
+        source_digest = hashlib.sha256(Path(source_file).read_bytes()).hexdigest()
+    else:
+        source_digest = "unknown"
+    kind = "path" if cvxeda_path is not None else "import"
+    return f"{kind}:{cvxeda_callable.__module__}:{source_digest}|{parameters}"
 
 
 def _cvxeda_source(decomposition_callable: Callable | None, cvxeda_path: Path | None) -> str:

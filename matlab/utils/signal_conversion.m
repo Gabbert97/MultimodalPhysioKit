@@ -26,7 +26,7 @@ function [p_data] = signal_conversion(data,att,channels)
             NTC_V = data(:,i)*VCC/(2^n(i));                                 % NTC output in Volt [V]
             NTC_Ohm = (NTC_V.*1e+4)./(VCC-NTC_V);                             % NTC resistance in Ohm [Ohm]
             TMP_K = 1./(a0 + a1 * log(NTC_Ohm) + a2 * (log(NTC_Ohm)).^3);   % Temperature [°K]
-            p_data.temp = TMP_K - 273.5;                                    % Temperature [°C]
+            p_data.temp = TMP_K - 273.15;                                   % Temperature [°C]
         % Respiration
         elseif strcmp(att{i},'RIP')
             p_data.rip = (data(:,i)./(2^n(i)) - 0.5).*100;                  % Displacement value in percentage [%] of full scale

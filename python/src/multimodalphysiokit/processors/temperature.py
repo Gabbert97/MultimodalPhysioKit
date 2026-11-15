@@ -10,6 +10,10 @@ from scipy.signal import butter, filtfilt
 from multimodalphysiokit.core import ProcessingResult, Signal
 
 
+# A window is an artifact candidate when an extremum deviates from the phase
+# mean by more than this many degrees (degC or K; about 6 % of 33 degC).
+_ARTIFACT_DEVIATION_DEGREES = 2.0
+
 _FEATURE_NAMES = (
     "temperature_delta",
     "temperature_mean",
@@ -178,11 +182,11 @@ def _screen_temperature_phase_artifacts(
         raise ValueError("temperature phase must contain at least 2 samples after artifact rejection")
 
     mean_filtered_phase = np.mean(filtered_phase)
-    mean_diff_filtered_phase = np.mean(np.diff(filtered_phase))
+    # Robust baseline: artifacts cannot inflate the median of |diff|.
+    median_abs_diff_filtered_phase = np.median(np.abs(np.diff(filtered_phase)))
     window_length = int(2 * sampling_frequency)
     if window_length <= 0:
         raise ValueError("temperature artifact screening window length must be positive")
-    threshold_percentage_max_relative = 1.06
     threshold_diff = 100
 
     if window_length < length_phase:
@@ -208,12 +212,12 @@ def _screen_temperature_phase_artifacts(
             )
             max_min_indexes = np.clip(max_min_indexes, 0, window.size - 1)
 
-        has_relative_amplitude_artifact = (
-            np.any(window[max_min_indexes] > threshold_percentage_max_relative * mean_filtered_phase)
-            or np.any(window[max_min_indexes] < (2 - threshold_percentage_max_relative) * mean_filtered_phase)
+        has_amplitude_artifact = np.any(
+            np.abs(window[max_min_indexes] - mean_filtered_phase)
+            > _ARTIFACT_DEVIATION_DEGREES
         )
-        has_diff_artifact = mean_diff_window > threshold_diff * mean_diff_filtered_phase
-        valid[start_index : end_index + 1] = not (has_relative_amplitude_artifact and has_diff_artifact)
+        has_diff_artifact = mean_diff_window > threshold_diff * median_abs_diff_filtered_phase
+        valid[start_index : end_index + 1] = not (has_amplitude_artifact and has_diff_artifact)
 
     if not np.any(valid):
         raise ValueError("all temperature samples were rejected as artifacts")

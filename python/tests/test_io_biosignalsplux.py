@@ -48,7 +48,7 @@ def expected_temp(raw, resolution=16):
     a1 = 2.34282709e-4
     a2 = 8.77303013e-8
     tmp_k = 1.0 / (a0 + a1 * np.log(ntc_ohm) + a2 * np.log(ntc_ohm) ** 3)
-    return tmp_k - 273.5
+    return tmp_k - 273.15
 
 
 def expected_rip(raw, resolution=16):
@@ -403,3 +403,15 @@ def test_selected_fnirs_length_mismatch_raises_value_error(tmp_path):
 
     with pytest.raises(ValueError, match="equal lengths"):
         read_biosignalsplux_hdf5(file_path)
+
+
+def test_temp_nominal_ntc_resistance_reads_25_degrees_celsius(tmp_path):
+    # Mid-scale ADC -> 1.5 V across the divider -> 10 kOhm, the nominal
+    # resistance of the 10 kOhm NTC, whose Steinhart-Hart coefficients give
+    # 298.15 K. Kelvin to Celsius must subtract 273.15 (the SI definition).
+    file_path = tmp_path / "temp_nominal.h5"
+    write_biosignalsplux_file(file_path, sensors=("TEMP",), data={1: np.asarray([32768, 32768, 32768])})
+
+    signal = read_biosignalsplux_hdf5(file_path).get_signal("temp")
+
+    np.testing.assert_allclose(signal.samples, 25.0, atol=1e-3)

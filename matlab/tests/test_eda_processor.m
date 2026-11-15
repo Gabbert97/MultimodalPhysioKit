@@ -117,9 +117,26 @@ processor = mpk.EDAProcessor();
 output = processor.downsampleSignal(signal);
 expectedIndexes = 1:2:signal.count();
 
-verifyEqual(testCase,output.Eda,signal.Samples(expectedIndexes))
+% In-band content passes the 40 Hz anti-alias filter intact.
+verifyEqual(testCase,output.Eda,signal.Samples(expectedIndexes), ...
+    'AbsTol',1e-4)
 verifyEqual(testCase,output.Time,signal.Time(expectedIndexes))
 verifyEqual(testCase,output.SamplingFrequency,100)
+end
+
+function testDownsampleRemovesContentAboveNewNyquist(testCase)
+% 100.2 Hz interference would alias to 0.2 Hz (SCR band) under plain
+% decimation from 1000 Hz to 100 Hz; it must be removed.
+fs = 1000;
+time = (0:(60*fs-1))' / fs;
+physiological = 2 + 0.3*sin(2*pi*0.05*time);
+signal = mpk.Signal( ...
+    physiological + 0.5*sin(2*pi*100.2*time),time,fs,'eda','uS');
+output = mpk.EDAProcessor().downsampleSignal(signal);
+expected = physiological(1:10:end);
+edge = 5;  % exclude the zero-phase boundary transient (50 ms)
+verifyEqual(testCase,output.Eda(edge+1:end-edge), ...
+    expected(edge+1:end-edge),'AbsTol',1e-3)
 end
 
 function testInvalidSignalAndSamplingFrequencyAreRejected(testCase)
@@ -319,6 +336,29 @@ verifyTrue(testCase,all(cellfun( ...
     @(name) ~isempty(regexp(name, ...
         '^eda_[0-9a-f]{16}_decomposition\.mat$','once')), ...
     {cacheFiles.name})))
+end
+
+function testCacheIsNotReusedByDifferentDecomposition(testCase)
+cacheDirectory = localTemporaryDirectory();
+cleanupDirectory = onCleanup(@() localRemoveDirectory(cacheDirectory)); %#ok<NASGU>
+signal = localEdaSignal('eda',0,20,100);
+fake_cvxeda('reset');
+first = mpk.EDAProcessor( ...
+    'DecompositionCallable',@fake_cvxeda, ...
+    'CacheDirectory',cacheDirectory, ...
+    'OutputLabel','eda');
+first.decompose(signal);
+
+fake_cvxeda('reset');
+second = mpk.EDAProcessor( ...
+    'DecompositionCallable',@(eda,delta) fake_cvxeda(eda,delta), ...
+    'CacheDirectory',cacheDirectory, ...
+    'OutputLabel','eda');
+second.decompose(signal);
+fakeState = fake_cvxeda('state');
+verifyEqual(testCase,fakeState.CallCount,1)
+verifyEqual(testCase, ...
+    numel(dir(fullfile(cacheDirectory,'eda_*_decomposition.mat'))),2)
 end
 
 function testMalformedCacheIsRejected(testCase)

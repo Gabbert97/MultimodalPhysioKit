@@ -41,10 +41,11 @@ for phase = 1 : length(all_indexes_phases)
     diff_filtered_temperature_phase = diff(filtered_temperature_phase);
     time_phase = time(indexes_phase);
     mean_filtered_temperature_phase = mean(filtered_temperature_phase);
-    mean_diff_filtered_temperature_phase = mean(diff_filtered_temperature_phase);
+    % Robust baseline: artifacts cannot inflate the median of |diff|.
+    median_abs_diff_filtered_temperature_phase = median(abs(diff_filtered_temperature_phase));
     % Screen short windows for abrupt artifacts before feature extraction.
     window_length = 2*fs;                                                   % in samples (-)
-    threshold_percentage_max_relative = 1.06;                               % percentage (%)
+    threshold_deviation_degrees = 2.0;                                      % degC or K (about 6% of 33 degC)
     threshold_diff = 100;                                                   % percentage (%)
     length_filtered_temperature_phase = length(filtered_temperature_phase); % in samples
     if window_length < length_filtered_temperature_phase
@@ -71,9 +72,8 @@ for phase = 1 : length(all_indexes_phases)
         if isempty(filtered_temperature_phase_window(max_min_indexes))
             max_min_indexes = [1 round(length(interval_samples)/2) length(interval_samples)];
         end
-        if (any(filtered_temperature_phase_window(max_min_indexes) > threshold_percentage_max_relative * mean_filtered_temperature_phase) || ...
-                any(filtered_temperature_phase_window(max_min_indexes) < (2-threshold_percentage_max_relative) * mean_filtered_temperature_phase)) && ...
-                mean_diff_filtered_temperature_phase_window > threshold_diff * mean_diff_filtered_temperature_phase
+        if any(abs(filtered_temperature_phase_window(max_min_indexes) - mean_filtered_temperature_phase) > threshold_deviation_degrees) && ...
+                mean_diff_filtered_temperature_phase_window > threshold_diff * median_abs_diff_filtered_temperature_phase
             filtered_temperature_phase(interval_samples,2) = zeros(length(interval_samples),1);
         else
             filtered_temperature_phase(interval_samples,2) = ones(length(interval_samples),1);

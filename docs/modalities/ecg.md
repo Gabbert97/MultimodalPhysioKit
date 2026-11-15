@@ -48,6 +48,20 @@ Frequency-domain keys:
 
 Feature names never include a phase label.
 
+`ecg_pnn50` is the share of successive differences between adjacent accepted
+inter-beat intervals that exceed 50 ms (Task Force of the ESC/NASPE, 1996),
+reported as a fraction. A difference is evaluated only when both neighbouring
+intervals were accepted by IBI screening; pairs spanning a rejected interval
+are skipped. `ecg_pnn50_max` is the longest run of consecutive differences
+exceeding 50 ms, divided by the expected number of IBIs in two minutes
+(`120 * n_ibi / sum(ibi)`). Both are zero when no difference qualifies.
+
+In PSD mode (`label_frequency_analysis=2`), every accepted IBI is placed at
+the real time of the R-peak that closes it before resampling the tachogram
+at 4 Hz. Rejected intervals therefore leave a gap that is interpolated over,
+rather than being removed from the timeline (which would compress time and
+shift spectral content upward).
+
 Result metadata contains `source`, `sampling_frequency`, `n_samples`,
 `start_time_seconds`, `end_time_seconds`, `frequency_analysis_method`, and
 `return_intermediates`.

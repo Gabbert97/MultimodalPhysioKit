@@ -157,3 +157,101 @@ def test_stft_plotting_writes_expected_files_and_preserves_intermediates(tmp_pat
     assert (tmp_path / "stft_test_STFT_HRV.png").is_file()
     assert (tmp_path / "stft_test_STFT_LFHF.png").is_file()
     assert plt.get_fignums() == []
+
+
+def test_pnn50_compares_only_truly_adjacent_ibis_after_a_rejected_interval():
+    from multimodalphysiokit.processors.ecg import _ecg_time_domain_feature_values
+
+    # Interval 3 was rejected, so the accepted IBIs form two contiguous runs:
+    # [0.8, 0.8, 0.8] and [1.0, 1.0, 1.1, 1.2]. Successive differences within
+    # the runs are [0, 0] and [0, 0.1, 0.1]; no difference may span the gap.
+    # Textbook pNN50: 2 of the 5 evaluated differences exceed 50 ms.
+    flags = np.array([1, 1, 1, 0, 1, 1, 1, 1])
+    ibi = np.array([0.8, 0.8, 0.8, 1.0, 1.0, 1.1, 1.2])
+
+    features = _ecg_time_domain_feature_values(60 / ibi, ibi, flags)
+
+    assert features["ecg_pnn50"] == pytest.approx(2 / 5)
+    expected_ibis_in_2_minutes = 120 * ibi.size / ibi.sum()
+    assert features["ecg_pnn50_max"] == pytest.approx(2 / expected_ibis_in_2_minutes)
+
+
+def test_pnn50_ignores_step_change_across_a_rejected_interval():
+    from multimodalphysiokit.processors.ecg import _ecg_time_domain_feature_values
+
+    # Each contiguous run is perfectly regular; the only large change lies
+    # across the rejected interval and therefore is not a successive difference.
+    flags = np.array([1, 1, 1, 0, 1, 1, 1])
+    ibi = np.array([0.8, 0.8, 0.8, 1.0, 1.0, 1.0])
+
+    features = _ecg_time_domain_feature_values(60 / ibi, ibi, flags)
+
+    assert features["ecg_pnn50"] == 0.0
+
+
+def test_pnn50_counts_isolated_differences_above_50_ms():
+    from multimodalphysiokit.processors.ecg import _ecg_time_domain_feature_values
+
+    # Task Force (1996) pNN50: share of successive NN differences > 50 ms.
+    # Alternating 0.8/0.9 s intervals: 5 of 9 differences are 100 ms.
+    ibi = np.array([0.8, 0.9, 0.9, 0.8, 0.8, 0.9, 0.9, 0.8, 0.8, 0.9])
+    flags = np.ones(ibi.size, dtype=int)
+
+    features = _ecg_time_domain_feature_values(60 / ibi, ibi, flags)
+
+    assert features["ecg_pnn50"] == pytest.approx(5 / 9)
+    # Longest run of consecutive qualifying differences is 1.
+    assert features["ecg_pnn50_max"] == pytest.approx(1 / (120 * ibi.size / ibi.sum()))
+
+
+def test_pnn50_excludes_differences_of_50_ms_or_less():
+    from multimodalphysiokit.processors.ecg import _ecg_time_domain_feature_values
+
+    ibi = np.array([0.80, 0.84, 0.80, 0.84, 0.80, 0.84])  # all differences 40 ms
+    flags = np.ones(ibi.size, dtype=int)
+
+    features = _ecg_time_domain_feature_values(60 / ibi, ibi, flags)
+
+    assert features["ecg_pnn50"] == 0.0
+    assert features["ecg_pnn50_max"] == 0.0
+
+
+def _rsa_beats(duration_seconds=300.0, rsa_frequency=0.25):
+    beat_times = [0.0]
+    while beat_times[-1] < duration_seconds:
+        last = beat_times[-1]
+        beat_times.append(last + 0.9 + 0.05 * np.sin(2 * np.pi * rsa_frequency * last))
+    beat_times = np.asarray(beat_times)
+    return np.diff(beat_times), beat_times[:-1]
+
+
+def test_psd_tachogram_keeps_real_time_across_rejected_intervals():
+    from multimodalphysiokit.processors.ecg import _uniform_ibi_tachogram_from_ibi
+
+    ibi, starts = _rsa_beats()
+    keep = np.ones(ibi.size, dtype=bool)
+    keep[np.arange(15, ibi.size - 15, 25)] = False  # rejected intervals
+    true_span = (starts[keep][-1] + ibi[keep][-1]) - starts[keep][0]
+
+    uniform_time, tachogram = _uniform_ibi_tachogram_from_ibi(
+        ibi[keep], 4, ibi_start_times=starts[keep]
+    )
+
+    # The resampled tachogram must cover the real elapsed time ...
+    assert uniform_time[-1] == pytest.approx(true_span, abs=0.25)
+    # ... so respiratory sinus arrhythmia stays at its true 0.25 Hz.
+    n_fft = 1 << 16
+    spectrum = np.abs(np.fft.rfft(tachogram * np.hanning(tachogram.size), n_fft))
+    frequencies = np.fft.rfftfreq(n_fft, d=1 / 4)
+    assert frequencies[np.argmax(spectrum)] == pytest.approx(0.25, abs=0.002)
+
+
+def test_psd_tachogram_without_rejections_matches_cumulative_timeline():
+    from multimodalphysiokit.processors.ecg import _uniform_ibi_tachogram_from_ibi
+
+    ibi, starts = _rsa_beats(duration_seconds=120.0)
+    time_a, values_a = _uniform_ibi_tachogram_from_ibi(ibi, 4)
+    time_b, values_b = _uniform_ibi_tachogram_from_ibi(ibi, 4, ibi_start_times=starts + 7.0)
+
+    np.testing.assert_allclose(time_b, time_a, atol=1e-9)
+    np.testing.assert_allclose(values_b, values_a, atol=1e-9)

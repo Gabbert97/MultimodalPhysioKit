@@ -62,6 +62,26 @@ verifyTrue(testCase,all(cellfun( ...
 verifyFalse(testCase,any(contains(result.Features(:,1),'__')))
 end
 
+function testFeaturesUnaffectedByInterferenceAboveNewNyquist(testCase)
+% 100.1 Hz interference would alias to 0.1 Hz under plain decimation from
+% 1000 Hz to 100 Hz and distort breath detection and amplitudes.
+fs = 1000;
+time = (0:(120*fs-1))' / fs;
+breathing = sin(2*pi*(0.25*time + 0.3*sin(2*pi*0.013*time)));
+clean = mpk.Signal(breathing,time,fs,'rip','');
+noisy = mpk.Signal(breathing + 0.5*sin(2*pi*100.1*time),time,fs,'rip','');
+processor = mpk.RespirationProcessor();
+cleanFeatures = processor.process(clean).Features;
+noisyFeatures = processor.process(noisy).Features;
+names = {'respiration_breath_rate_mean','respiration_amplitude_mean', ...
+    'respiration_inspiratory_time_mean','respiration_expiratory_time_mean'};
+for index = 1:numel(names)
+    row = strcmp(cleanFeatures(:,1),names{index});
+    verifyEqual(testCase,noisyFeatures{row,2},cleanFeatures{row,2}, ...
+        'RelTol',1e-3,names{index})
+end
+end
+
 function testProcessedSampleMetadataReflectsDownsampling(testCase)
 signal = localRespirationSignal('belt',0,60,200);
 processor = mpk.RespirationProcessor();

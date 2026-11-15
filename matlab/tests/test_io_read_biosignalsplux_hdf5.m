@@ -59,6 +59,13 @@ verifyEqual(testCase,ecgSignal.Samples,expectedEcg.ecg(:), ...
     'AbsTol',1e-12)
 end
 
+function testNominalNtcResistanceReads25DegreesCelsius(testCase)
+% Mid-scale 16-bit ADC -> 1.5 V -> 10 kOhm, the nominal NTC resistance,
+% whose Steinhart-Hart coefficients give 298.15 K = 25 degC.
+converted = signal_conversion(32768*ones(3,1),{'TEMP'},[1 16]);
+verifyEqual(testCase,converted.temp,25*ones(3,1),'AbsTol',1e-3)
+end
+
 function testUsesFnirsColumnOrder(testCase)
 samplePath = fullfile(testCase.TestData.RepositoryRoot,'examples', ...
     'sample_data','synthetic_multimodal_180s.hdf5');

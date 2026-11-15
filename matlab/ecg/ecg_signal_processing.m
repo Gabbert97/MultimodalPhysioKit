@@ -256,49 +256,15 @@ for phase = 1:number_phases
     intermediates.bpm{phase} = BPM;
     intermediates.bpm_times{phase} = accepted_ibi_times;
 
-    % Initialize pNN50-related counters.
-    diff_ibi_phase = [];
-    length_adjacent_intervals = [];
-    k = 1;
-    m = 1;
-    IBI_counter = 1;
-    indexes_phases_IBI = [];
-    
     %% Time-domain HRV features
     % Mean, standard deviation, and median heart rate.
     ecg_features{1,phase+1} = mean(BPM);
     ecg_features{2,phase+1} = std(BPM);
     ecg_features{3,phase+1} = median(BPM);
-    % pNN50-style descriptors based on adjacent IBI differences >= 50 ms.
-    for j = 1 : length(control_ibi_flag) - 1
-        if control_ibi_flag(j)~=0 && control_ibi_flag(j+1)~=0
-            diff_ibi_phase(j) = abs(ibi_def_phase(m+1) - ibi_def_phase(m));
-            m = m + 1;
-        else
-            diff_ibi_phase(j) = 0;
-        end
-    end
-    i_diff_ibi_phase_50 = find(diff_ibi_phase >= 0.05);
-    for j = 1 : length(i_diff_ibi_phase_50) - 1
-        if i_diff_ibi_phase_50(j+1) - i_diff_ibi_phase_50(j) == 1 && length(length_adjacent_intervals) < k
-            length_adjacent_intervals(k) = 2;
-        elseif i_diff_ibi_phase_50(j+1) - i_diff_ibi_phase_50(j) == 1
-            length_adjacent_intervals(k) = length_adjacent_intervals(k) + 1;
-        elseif  i_diff_ibi_phase_50(j+1) - i_diff_ibi_phase_50(j) ~= 1 && length(length_adjacent_intervals) == k
-            k = k + 1;
-        end
-    end
-    % Estimate the expected number of IBIs in a two-minute window.
-    mean_number_IBI_2_minutes = round(120*length(ibi_def_phase))/sum(ibi_def_phase);
-    % If no adjacent IBI differences exceed 50 ms, store zeros for the
-    % corresponding pNN50-derived features.
-    if isempty(max(length_adjacent_intervals))
-        ecg_features{4,phase+1} = 0;
-        ecg_features{5,phase+1} = 0;
-    else
-        ecg_features{4,phase+1} = sum(length_adjacent_intervals)/length(ibi_def_phase);
-        ecg_features{5,phase+1} = max(length_adjacent_intervals)/mean_number_IBI_2_minutes;
-    end
+    % pNN50 (share of successive differences > 50 ms between adjacent
+    % accepted IBIs) and the longest run of such differences.
+    [ecg_features{4,phase+1},ecg_features{5,phase+1}] = ...
+        ecg_pnn50_features(ibi_def_phase,control_ibi_flag);
     length_BPM_phases = [length_BPM_phases; length(BPM)];
     BPM_def = [BPM_def,BPM];
     ibi_def = [ibi_def,ibi_def_phase];
@@ -342,7 +308,7 @@ if label_frequency_analysis == 1
     stft_context = local_build_stft_context(ecg,time,i_phases,fs);
 end
 
-[mean_PLF_final,std_PLF_final,mean_PHF_final,std_PHF_final,mean_LF_HF_ratio_final,std_LF_HF_ratio_final,frequency_data] = frequency_analysis_ecg(ibi_def,length_BPM_phases,condition_columns,label_frequency_analysis,saving_flag,phase_selection_flag,output_label,gr,stft_context);
+[mean_PLF_final,std_PLF_final,mean_PHF_final,std_PHF_final,mean_LF_HF_ratio_final,std_LF_HF_ratio_final,frequency_data] = frequency_analysis_ecg(ibi_def,length_BPM_phases,condition_columns,label_frequency_analysis,saving_flag,phase_selection_flag,output_label,gr,stft_context,intermediates.ibi_times);
 intermediates.frequency = frequency_data;
 for phase = 1 : number_phases
     ecg_features{6,phase+1} = mean_PLF_final(phase);

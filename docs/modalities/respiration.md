@@ -38,6 +38,13 @@ breath pairing, respiratory quantities, and feature extraction occur inside
 the processor. Do not manually downsample or convert temporal phases to sample
 indexes.
 
+Before downsampling, a zero-phase 4th-order Butterworth low-pass at 40 Hz
+(0.4 x the 100 Hz target rate) removes content above the new Nyquist
+frequency so that it cannot alias into the analysis band; every k-th
+sample is then kept, so sample timing is unchanged. Inputs already at
+100 Hz are not filtered by this step. A brief zero-phase boundary
+transient (tens of milliseconds) can remain at each signal edge.
+
 When used with `Recording.process_phases()`, every phase is downsampled and
 processed independently.
 

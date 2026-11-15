@@ -118,7 +118,8 @@ if isempty(options.CacheDirectory)
     cachePath = '';
     return
 end
-digest = localSignalDigest(eda,time,fs);
+digest = localSignalDigest( ...
+    eda,time,fs,localDecompositionIdentity(options));
 cachePath = fullfile(options.CacheDirectory, ...
     sprintf('%s_%s_decomposition.mat', ...
         options.OutputLabel,digest(1:16)));
@@ -159,12 +160,13 @@ end
 value = double(rawValue(:));
 end
 
-function digest = localSignalDigest(eda,time,fs)
+function digest = localSignalDigest(eda,time,fs,identity)
 engine = javaMethod( ...
     'getInstance','java.security.MessageDigest','SHA-256');
 localUpdateDigest(engine,double(eda(:)));
 localUpdateDigest(engine,double(time(:)));
 localUpdateDigest(engine,double(fs));
+engine.update(typecast(unicode2native(identity,'UTF-8'),'int8'));
 digestBytes = typecast(engine.digest(),'uint8');
 digest = lower(reshape(dec2hex(digestBytes,2).',1,[]));
 end
@@ -177,4 +179,49 @@ end
 function localRestorePath(originalPath)
 path(originalPath)
 rehash path
+end
+
+function identity = localDecompositionIdentity(options)
+% Describe the decomposition source so caches are never shared across
+% different decompositions (callable, CvxedaPath file, or path cvxEDA.m).
+parameters = 'delta_knot=10|alpha=0.0008|gamma=0.01|tau0=2|tau1=0.7';
+if ~isempty(options.DecompositionCallable)
+    identity = ['callable:' func2str(options.DecompositionCallable) ...
+        '|' parameters];
+    return
+end
+if ~isempty(options.CvxedaPath)
+    kind = 'path';
+    target = options.CvxedaPath;
+    if isfolder(target)
+        cvxedaFile = fullfile(target,'cvxEDA.m');
+    else
+        cvxedaFile = target;
+    end
+else
+    kind = 'import';
+    cvxedaFile = which('cvxEDA');
+end
+identity = [kind ':' localFileDigest(cvxedaFile) '|' parameters];
+end
+
+function digest = localFileDigest(filePath)
+if isempty(filePath) || ~isfile(filePath)
+    digest = 'unknown';
+    return
+end
+fileId = fopen(filePath,'r');
+if fileId < 0
+    digest = 'unknown';
+    return
+end
+closeFile = onCleanup(@() fclose(fileId));
+bytes = fread(fileId,Inf,'*uint8');
+engine = javaMethod( ...
+    'getInstance','java.security.MessageDigest','SHA-256');
+if ~isempty(bytes)
+    engine.update(typecast(bytes(:),'int8'));
+end
+digestBytes = typecast(engine.digest(),'uint8');
+digest = lower(reshape(dec2hex(digestBytes,2).',1,[]));
 end

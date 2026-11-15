@@ -50,7 +50,16 @@ Result metadata contains `source`, `sampling_frequency`, `n_samples`,
 
 The pipeline applies the validated low-pass filter, screens short windows for
 abrupt artifacts, calculates level/change/trend, and summarizes the first
-derivative. Peripheral temperature depends on placement, contact,
+derivative.
+
+Artifact screening uses 2-second windows. A window is removed when both
+(a) a local extremum in it deviates from the phase mean by more than 2.0
+degrees, and (b) its mean absolute sample-to-sample change exceeds 100 times
+the phase's median absolute change. The thresholds are absolute temperature
+differences, so results are identical for degrees Celsius and kelvin;
+convert degrees Fahrenheit to Celsius before processing. The median baseline
+keeps a large artifact from masking itself, and the absolute changes make
+screening symmetric for warming and cooling. Peripheral temperature depends on placement, contact,
 acclimatization, environment, calibration, and phase duration.
 
 ## Methodological references

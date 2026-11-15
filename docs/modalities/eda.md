@@ -32,6 +32,13 @@ decomposed by external cvxEDA, processed for SCR events, and summarized into
 features. Input sampling frequency must meet the processor's integer
 downsampling requirement.
 
+Before downsampling, a zero-phase 4th-order Butterworth low-pass at 40 Hz
+(0.4 x the 100 Hz target rate) removes content above the new Nyquist
+frequency so that it cannot alias into the analysis band; every k-th
+sample is then kept, so sample timing is unchanged. Inputs already at
+100 Hz are not filtered by this step. A brief zero-phase boundary
+transient (tens of milliseconds) can remain at each signal edge.
+
 MultimodalPhysioKit pairs each local maximum of the 2 Hz low-pass-filtered
 phasic signal with its immediately preceding local minimum. SCR amplitude is
 the resulting trough-to-peak change in microSiemens, not the absolute phasic
@@ -74,6 +81,14 @@ not clip or otherwise modify its decomposition outputs. There is no production
 fallback. Install v1.1.0, provide `cvxeda_path`, or provide a compatible
 `decomposition_callable`. Optional caching is keyed by the complete supplied
 signal and processing dependency. See [Dependencies](../dependencies.md).
+
+The cache key includes the decomposition source, plus the cvxEDA parameters:
+in Python the module and qualified name of a `decomposition_callable`, or a
+hash of the cvxEDA source file for an installed module or `cvxeda_path`; in
+MATLAB `func2str` of a `DecompositionCallable`, or a hash of the resolved
+`cvxEDA.m`. A cached result is therefore never reused by a different
+decomposition. In Python, the decomposition source must be resolvable even
+when a cached result exists.
 
 Record cvxEDA implementation and solver versions for reproducibility.
 

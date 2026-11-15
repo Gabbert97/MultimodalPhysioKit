@@ -219,3 +219,41 @@ verifyEqual(testCase,actual(:,1),expected(:,1))
 verifyEqual(testCase,cell2mat(actual(:,2)),cell2mat(expected(:,2)), ...
     'AbsTol',1e-12)
 end
+
+function testSmoothDriftIsKeptWholeForCoolingAndWarming(testCase)
+% A smooth, artifact-free 6 degC drift must not be screened out in either
+% direction: the delta must be the physical +/-6 degC change.
+fs = 10;
+time = (0:(300*fs-1))' / fs;
+processor = mpk.TemperatureProcessor();
+warming = processor.process(mpk.Signal(30 + 6*time/time(end),time,fs,'temp','degC'));
+cooling = processor.process(mpk.Signal(36 - 6*time/time(end),time,fs,'temp','degC'));
+verifyEqual(testCase,localFeature(warming,'temperature_delta'),6,'AbsTol',1e-3)
+verifyEqual(testCase,localFeature(cooling,'temperature_delta'),-6,'AbsTol',1e-3)
+end
+
+function testArtifactScreeningIsTheSameInCelsiusAndKelvin(testCase)
+% A 1 s, 5 degC detachment drop on a stable 33 degC signal. Temperature
+% differences do not depend on the absolute scale.
+fs = 10;
+time = (0:(300*fs-1))' / fs;
+noise = 0.01*sin(2*pi*0.37*time) .* cos(2*pi*1.3*time);
+celsius = 33 + noise;
+celsius(time >= 150 & time < 151) = celsius(time >= 150 & time < 151) - 5;
+processor = mpk.TemperatureProcessor();
+resultC = processor.process(mpk.Signal(celsius,time,fs,'temp','degC'));
+resultK = processor.process(mpk.Signal(celsius + 273.15,time,fs,'temp','K'));
+names = resultC.Features(:,1);
+for index = 1:numel(names)
+    expected = resultC.Features{index,2};
+    if strcmp(names{index},'temperature_mean')
+        expected = expected + 273.15;
+    end
+    verifyEqual(testCase,localFeature(resultK,names{index}),expected, ...
+        'RelTol',1e-6,'AbsTol',1e-9,names{index})
+end
+end
+
+function value = localFeature(result,name)
+value = result.Features{strcmp(result.Features(:,1),name),2};
+end
