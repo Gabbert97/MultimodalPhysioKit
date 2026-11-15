@@ -53,6 +53,10 @@ results.ECG = recording.processPhases( ...
         'ReturnIntermediates',true), ...
     'ecg');
 
+ppgProcessor = mpk.PPGProcessor('LabelFrequencyAnalysis',1);
+ppgProcessor.ShowPlots = showPlots;
+results.PPG = recording.processPhases(ppgProcessor,'ppg');
+
 fnirsProcessor = mpk.FNIRSProcessor('AgeYears',25);
 baselineRed = recording.extractPhase('fnirs_red','baseline');
 baselineInfrared = recording.extractPhase( ...

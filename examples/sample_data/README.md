@@ -24,13 +24,14 @@ physiology.
 - Samples per channel: 18,000
 - ADC resolution: 16 bits
 - NumPy random seed: 20260808
-- Channels: ECG, EDA, RIP respiration, temperature, fNIRS red, and fNIRS
-  infrared
-- Generator: `MultimodalPhysioKit synthetic sample generator v1`
+- Channels: ECG, EDA, RIP respiration, temperature, PPG (PLUX BVP sensor),
+  fNIRS red, and fNIRS infrared
+- Generator: `MultimodalPhysioKit synthetic sample generator v2`
 - Data license: CC0-1.0, as recorded in the HDF5 metadata
 
 The ECG contains deterministic synthetic beats near 72 beats per minute with
-modest rate variability. EDA contains a tonic component and modeled phasic
+modest rate variability. The PPG has one pulse per ECG beat, 0.20 s after the
+R-peak, with a systolic and a smaller dicrotic wave. EDA contains a tonic component and modeled phasic
 responses. Respiration, temperature, and fNIRS contain smooth deterministic
 trends and oscillations with small seeded noise. These constructions are
 chosen to exercise software paths, not to model a population or experimental
@@ -43,6 +44,7 @@ ecg
 eda
 rip
 temp
+ppg
 fnirs_red
 fnirs_infrared
 ```

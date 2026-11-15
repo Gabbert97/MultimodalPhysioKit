@@ -25,7 +25,7 @@ private archive; its Git history is never transferred to the public repository.
 - [ ] Confirm the complete MATLAB test suite is green locally, allowing only
       documented optional-dependency assumptions.
 - [ ] Confirm the MATLAB/Python cross-language validation passes for ECG, EDA,
-      respiration, temperature, and fNIRS.
+      respiration, temperature, PPG, and fNIRS.
 - [ ] If PPG processing changed, rerun
       `examples/ppg_maus_validation/validate_ppg_maus.py` on MAUS and update
       the tables in `docs/modalities/ppg.md`.

@@ -30,7 +30,7 @@ recording.signal_names()
 The returned names are:
 
 ```text
-ecg, eda, rip, temp, fnirs_red, fnirs_infrared
+ecg, eda, rip, temp, ppg, fnirs_red, fnirs_infrared
 ```
 
 The reader recognizes these supported channels, converts their raw ADC values
@@ -57,6 +57,8 @@ Open:
   it, and runs `RespirationProcessor`.
 - [Temperature example](python/temperature_example.ipynb): loads `temp`, plots
   it, and demonstrates direct and phase processing.
+- [PPG example](python/ppg_example.ipynb): loads `ppg`, plots it, runs
+  `PPGProcessor`, and processes two segments independently.
 - [fNIRS example](python/fnirs_example.ipynb): loads the red and infrared
   currents, reuses a baseline, and processes two task phases independently.
 - [Multimodal example](python/multimodal_example.ipynb): reuses one temporal
@@ -76,6 +78,7 @@ The MATLAB examples are short, editable scripts:
 - [Respiration](matlab/respiration_example.m)
 - [EDA](matlab/eda_example.m)
 - [ECG](matlab/ecg_example.m)
+- [PPG](matlab/ppg_example.m)
 - [fNIRS](matlab/fnirs_example.m)
 - [Multimodal](matlab/multimodal_example.m)
 

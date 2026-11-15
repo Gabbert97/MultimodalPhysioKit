@@ -21,6 +21,14 @@ All changes below apply to both Python and MATLAB unless stated otherwise.
   frequency analysis for short real-time windows). Requires a sampling rate
   above 16 Hz. Validated on the public MAUS dataset against ECG and
   NeuroKit2 (`examples/ppg_maus_validation/`). See `docs/modalities/ppg.md`.
+- BioSignalsPlux reader: a PLUX BVP channel is returned as the `ppg` signal
+  in percent of ADC full scale (Python `read_biosignalsplux_hdf5`, MATLAB
+  `mpk.io.readBioSignalsPluxHdf5`).
+- The bundled synthetic fixture gains a PPG (BVP) channel 5, one pulse per
+  synthetic ECG beat (generator v2); all other channels are bit-identical.
+  New PPG examples (`examples/python/ppg_example.ipynb`,
+  `examples/matlab/ppg_example.m`); the multimodal examples and the
+  MATLAB/Python cross-language validation now include PPG.
 
 ### Fixed
 

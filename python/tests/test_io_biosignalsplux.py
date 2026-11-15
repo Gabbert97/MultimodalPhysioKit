@@ -160,6 +160,20 @@ def test_creates_rip_signal_from_rip_channel(tmp_path):
     assert signal.units == "percent full scale"
 
 
+def test_creates_ppg_signal_from_bvp_channel(tmp_path):
+    # BVP (blood volume pulse) is PLUX's PPG sensor. PPG amplitude has no
+    # standard physical unit, so samples are percent of the ADC full scale,
+    # centred at mid-scale: 0 -> -50 %, 2^15 -> 0 %, 2^16 -> +50 %.
+    file_path = tmp_path / "bvp.h5"
+    raw = np.asarray([0, 32768, 65536])
+    write_biosignalsplux_file(file_path, sensors=("BVP",), data={1: raw})
+
+    signal = read_biosignalsplux_hdf5(file_path).get_signal("ppg")
+
+    np.testing.assert_allclose(signal.samples, [-50.0, 0.0, 50.0])
+    assert signal.units == "percent full scale"
+
+
 def test_creates_respiration_signal_from_respiration_channel(tmp_path):
     file_path = tmp_path / "respiration.h5"
     raw = np.asarray([0, 32768, 65535])

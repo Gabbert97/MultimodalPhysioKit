@@ -16,6 +16,11 @@ supplied `Signal`. `process_ppg(...)` is the functional wrapper, and
 `detect_ppg_pulses(signal)` returns only the pulse-detection stage for
 debugging.
 
+`read_biosignalsplux_hdf5` returns a PLUX BVP (PPG) channel as the `ppg`
+signal, in percent of the ADC full scale (PPG amplitude has no standard
+physical unit). The bundled synthetic fixture contains one, used by
+`examples/python/ppg_example.ipynb` and `examples/matlab/ppg_example.m`.
+
 `label_frequency_analysis` selects HRV frequency analysis: `1` STFT, `2` PSD
 (both need at least 60 s of signal), or `None` to skip it. Use `None` for
 short signals such as completed real-time windows.

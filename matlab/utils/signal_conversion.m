@@ -11,7 +11,7 @@ function [p_data] = signal_conversion(data,att,channels)
 % Output
 % ------
 % P_DATA   : Struct with converted fields for recognized sensors:
-%            ecg, eda, rip, temp, fnirs, respiration, and/or events.
+%            ecg, eda, rip, ppg, temp, fnirs, respiration, and/or events.
 
     VCC = 3;                                                                % Operating Voltage [V]
     n = channels(:,2);                                                      % n of bits of the channel [-]
@@ -30,6 +30,9 @@ function [p_data] = signal_conversion(data,att,channels)
         % Respiration
         elseif strcmp(att{i},'RIP')
             p_data.rip = (data(:,i)./(2^n(i)) - 0.5).*100;                  % Displacement value in percentage [%] of full scale
+        % PPG (PLUX BVP sensor; no standard physical unit)
+        elseif strcmp(att{i},'BVP')
+            p_data.ppg = (data(:,i)./(2^n(i)) - 0.5).*100;                  % Percentage [%] of full scale, centred
         % fNIRS
         elseif strcmp(att{i},'hSpO2')
             p_data.fnirs(:,count) = 0.15*data(:,i)./(2^n(i));               % Photodiode current in microamperes [µA]

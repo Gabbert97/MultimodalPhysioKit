@@ -22,7 +22,7 @@ N_SAMPLES = SAMPLING_FREQUENCY * DURATION_SECONDS
 ADC_BITS = 16
 ADC_LEVELS = 2**ADC_BITS
 RANDOM_SEED = 20260808
-GENERATOR_ID = "MultimodalPhysioKit synthetic sample generator v1"
+GENERATOR_ID = "MultimodalPhysioKit synthetic sample generator v2"
 LICENSE_STATEMENT = (
     "CC0-1.0: mathematically generated data; no human measurements. "
     "To the extent possible under law, the author waives all copyright and related rights."
@@ -32,6 +32,7 @@ CHANNELS = (
     (2, "EDA", "eda"),
     (3, "RIP", "rip"),
     (4, "TEMP", "temp"),
+    (5, "BVP", "ppg"),
     (9, "hSpO2", "fnirs_red"),
     (10, "hSpO2", "fnirs_infrared"),
 )
@@ -40,6 +41,7 @@ EXPECTED_UNITS = {
     "eda": "uS",
     "rip": "percent full scale",
     "temp": "degC",
+    "ppg": "percent full scale",
     "fnirs_red": "uA",
     "fnirs_infrared": "uA",
 }
@@ -49,15 +51,23 @@ def _time() -> np.ndarray:
     return np.arange(N_SAMPLES, dtype=float) / SAMPLING_FREQUENCY
 
 
+def _beat_times() -> list[float]:
+    """Heartbeat times shared by the ECG and the PPG (72 bpm with slow variability)."""
+    beat_times = []
+    beat_time = 0.45
+    while beat_time < DURATION_SECONDS + 0.5:
+        beat_times.append(beat_time)
+        heart_rate = 72.0 + 2.0 * np.sin(2 * np.pi * 0.10 * beat_time)
+        heart_rate += 1.0 * np.sin(2 * np.pi * 0.025 * beat_time + 0.7)
+        beat_time += 60.0 / heart_rate
+    return beat_times
+
+
 def _synthetic_ecg(time: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     signal = 0.025 * np.sin(2 * np.pi * 0.20 * time)
     signal += 0.008 * np.sin(2 * np.pi * 0.05 * time + 0.4)
 
-    beat_time = 0.45
-    while beat_time < DURATION_SECONDS + 0.5:
-        heart_rate = 72.0 + 2.0 * np.sin(2 * np.pi * 0.10 * beat_time)
-        heart_rate += 1.0 * np.sin(2 * np.pi * 0.025 * beat_time + 0.7)
-        rr_interval = 60.0 / heart_rate
+    for beat_time in _beat_times():
         for offset, amplitude, width in (
             (-0.18, 0.08, 0.035),
             (-0.035, -0.12, 0.012),
@@ -66,9 +76,24 @@ def _synthetic_ecg(time: np.ndarray, rng: np.random.Generator) -> np.ndarray:
             (0.26, 0.24, 0.070),
         ):
             signal += amplitude * np.exp(-0.5 * ((time - (beat_time + offset)) / width) ** 2)
-        beat_time += rr_interval
 
     signal += rng.normal(0.0, 0.006, time.size)
+    return signal
+
+
+def _synthetic_ppg(time: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Fingertip-like PPG in percent of full scale, one pulse per ECG beat.
+
+    Each pulse starts 0.20 s after the R-peak (pulse arrival time) and has a
+    systolic wave plus a smaller dicrotic wave; breathing modulates the baseline.
+    """
+
+    signal = -10.0 + 1.5 * np.sin(2 * np.pi * 0.25 * time) + 0.8 * np.sin(2 * np.pi * time / 90.0)
+    for beat_time in _beat_times():
+        onset = beat_time + 0.20
+        for offset, amplitude, width in ((0.13, 12.0, 0.055), (0.40, 4.0, 0.08)):
+            signal += amplitude * np.exp(-0.5 * ((time - (onset + offset)) / width) ** 2)
+    signal += rng.normal(0.0, 0.05, time.size)
     return signal
 
 
@@ -138,6 +163,7 @@ def generate_physical_signals() -> dict[str, np.ndarray]:
         "eda": _synthetic_eda(time, rng),
         "rip": _synthetic_respiration(time, rng),
         "temp": _synthetic_temperature(time, rng),
+        "ppg": _synthetic_ppg(time, rng),
         "fnirs_red": fnirs_red,
         "fnirs_infrared": fnirs_infrared,
     }
@@ -173,6 +199,7 @@ def convert_to_raw(signals: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         "eda": signals["eda"] * (0.12 * ADC_LEVELS) / 3.0,
         "rip": (signals["rip"] / 100.0 + 0.5) * ADC_LEVELS,
         "temp": _temperature_to_raw(signals["temp"]),
+        "ppg": (signals["ppg"] / 100.0 + 0.5) * ADC_LEVELS,
         "fnirs_red": signals["fnirs_red"] * ADC_LEVELS / 0.15,
         "fnirs_infrared": signals["fnirs_infrared"] * ADC_LEVELS / 0.15,
     }
@@ -223,7 +250,7 @@ def _import_reader():
 
 def validate_fixture(path: Path, physical_signals: dict[str, np.ndarray]) -> None:
     recording = _import_reader()(path)
-    expected_names = ["ecg", "eda", "rip", "temp", "fnirs_red", "fnirs_infrared"]
+    expected_names = ["ecg", "eda", "rip", "temp", "ppg", "fnirs_red", "fnirs_infrared"]
     if recording.signal_names() != expected_names:
         raise AssertionError(f"unexpected canonical signals: {recording.signal_names()}")
     forbidden_metadata_keys = {"source_path", "file_path", "path"}
@@ -235,6 +262,7 @@ def validate_fixture(path: Path, physical_signals: dict[str, np.ndarray]) -> Non
         "eda": 2.0e-4,
         "rip": 8.0e-4,
         "temp": 1.0e-3,
+        "ppg": 8.0e-4,
         "fnirs_red": 1.2e-6,
         "fnirs_infrared": 1.2e-6,
     }

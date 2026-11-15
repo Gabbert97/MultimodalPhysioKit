@@ -137,6 +137,8 @@ elseif strcmpi(sensorLabel,'RIP')
     canonicalSensor = 'RIP';
 elseif strcmpi(sensorLabel,'RESPIRATION')
     canonicalSensor = 'RESPIRATION';
+elseif strcmpi(sensorLabel,'BVP')
+    canonicalSensor = 'BVP';
 elseif strcmpi(sensorLabel,'hSpO2')
     canonicalSensor = 'hSpO2';
 else
@@ -156,6 +158,8 @@ switch canonicalSensor
         signalName = 'rip';
     case 'RESPIRATION'
         signalName = 'respiration';
+    case 'BVP'
+        signalName = 'ppg';
     otherwise
         signalName = '';
 end
@@ -169,7 +173,7 @@ switch signalName
         units = 'uS';
     case 'temp'
         units = 'degC';
-    case 'rip'
+    case {'rip','ppg'}
         units = 'percent full scale';
     case 'respiration'
         units = 'V';
