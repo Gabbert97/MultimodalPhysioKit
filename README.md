@@ -1,9 +1,5 @@
 # MultimodalPhysioKit
 
-<p align="center">
-  <img src="docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
-</p>
-
 [![Python CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml)
 [![MATLAB CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/multimodalphysiokit.svg)](https://pypi.org/project/multimodalphysiokit/)
@@ -20,6 +16,10 @@ processor operates on standardized `Signal` objects and is independent of the
 original data source, allowing the same processing pipeline to be used with
 in-memory arrays, generic HDF5 datasets, BioSignalsPlux/OpenSignals recordings,
 extracted experimental phases, or externally generated streaming windows.
+
+<p align="center">
+  <img src="docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
+</p>
 
 ## Key capabilities
 
