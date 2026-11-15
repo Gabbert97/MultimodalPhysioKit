@@ -5,6 +5,8 @@ classdef PPGProcessor
     %     'ReturnIntermediates',FLAG,'ShowPlots',FLAG) configures STFT
     % (METHOD = 1, default), PSD (METHOD = 2), or no HRV frequency analysis
     % (METHOD = [], for signals shorter than 60 s such as real-time windows).
+    % 'MaxPeakPosition' (default 0.5) is the latest accepted systolic-peak
+    % position as a fraction of the pulse; rounded wrist pulses may need ~0.65.
     %
     % RESULT = PROCESSOR.PROCESS(SIGNAL) analyses exactly the supplied
     % mpk.Signal as one piece and returns one mpk.ProcessingResult.
@@ -14,6 +16,7 @@ classdef PPGProcessor
         LabelFrequencyAnalysis
         ReturnIntermediates
         ShowPlots
+        MaxPeakPosition
     end
 
     methods
@@ -23,10 +26,12 @@ classdef PPGProcessor
             addParameter(parser,'LabelFrequencyAnalysis',1);
             addParameter(parser,'ReturnIntermediates',false);
             addParameter(parser,'ShowPlots',false);
+            addParameter(parser,'MaxPeakPosition',0.5);
             parse(parser,varargin{:});
             obj.LabelFrequencyAnalysis = parser.Results.LabelFrequencyAnalysis;
             obj.ReturnIntermediates = parser.Results.ReturnIntermediates;
             obj.ShowPlots = parser.Results.ShowPlots;
+            obj.MaxPeakPosition = parser.Results.MaxPeakPosition;
             obj.validate();
         end
 
@@ -40,7 +45,7 @@ classdef PPGProcessor
 
             [features,intermediates] = ppg_signal_processing( ...
                 signal.Samples,signal.Time,signal.SamplingFrequency, ...
-                obj.LabelFrequencyAnalysis,obj.ShowPlots);
+                obj.LabelFrequencyAnalysis,obj.ShowPlots,obj.MaxPeakPosition);
 
             metadata = struct( ...
                 'source','process_ppg', ...
@@ -49,6 +54,7 @@ classdef PPGProcessor
                 'start_time_seconds',signal.Time(1), ...
                 'end_time_seconds',signal.Time(end), ...
                 'frequency_analysis_method',obj.LabelFrequencyAnalysis, ...
+                'max_peak_position',obj.MaxPeakPosition, ...
                 'n_pulses',numel(intermediates.pulse_valid), ...
                 'n_valid_pulses',nnz(intermediates.pulse_valid), ...
                 'n_accepted_ibis',numel(intermediates.ibi));
@@ -62,7 +68,8 @@ classdef PPGProcessor
             options = struct( ...
                 'LabelFrequencyAnalysis',obj.LabelFrequencyAnalysis, ...
                 'ReturnIntermediates',obj.ReturnIntermediates, ...
-                'ShowPlots',obj.ShowPlots);
+                'ShowPlots',obj.ShowPlots, ...
+                'MaxPeakPosition',obj.MaxPeakPosition);
             result = mpk.ProcessingResult('ppg','process_ppg',features, ...
                 label,options,metadata,intermediates);
         end
@@ -79,6 +86,12 @@ classdef PPGProcessor
             if ~islogical(obj.ReturnIntermediates) || ~isscalar(obj.ReturnIntermediates)
                 error('mpk:PPGProcessor:InvalidReturnIntermediates', ...
                     'ReturnIntermediates must be a logical scalar.')
+            end
+            value = obj.MaxPeakPosition;
+            if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value) || ...
+                    value <= 0 || value > 1
+                error('mpk:PPGProcessor:InvalidMaxPeakPosition', ...
+                    'MaxPeakPosition must be a number in (0, 1].')
             end
             if ~islogical(obj.ShowPlots) || ~isscalar(obj.ShowPlots)
                 error('mpk:PPGProcessor:InvalidShowPlots', ...

@@ -10,13 +10,17 @@ All changes below apply to both Python and MATLAB unless stated otherwise.
 
 - PPG processor (`PPGProcessor`, `process_ppg`, `detect_ppg_pulses` in
   Python; `mpk.PPGProcessor` and `matlab/ppg/ppg_signal_processing.m` in
-  MATLAB). Detects pulse feet and systolic peaks on a 0.5-3.0 Hz band-passed
-  copy, measures all pulse characteristics on a drift-free cleaned copy
-  (0.5 Hz high-pass), screens pulse shape/duration against a running median,
-  and returns
-  pulse amplitude/duration/rise-time, BPM, pNN50, and optional HRV frequency
-  features (`label_frequency_analysis=None` skips frequency analysis for
-  short real-time windows). See `docs/modalities/ppg.md`.
+  MATLAB). Locates beats on a 0.5-3.0 Hz band-passed copy, ignoring shallow
+  troughs so the dicrotic notch does not split a pulse; measures all pulse
+  characteristics on a 0.5-8 Hz band-passed (cleaned) copy; takes as
+  systolic peak the first local maximum reaching 70 % of the pulse's highest
+  one; measures IBIs between systolic peaks; screens pulse shape/duration
+  against a running median with a configurable `max_peak_position` (default
+  0.5); and returns pulse amplitude/duration/rise-time, BPM, pNN50, and
+  optional HRV frequency features (`label_frequency_analysis=None` skips
+  frequency analysis for short real-time windows). Requires a sampling rate
+  above 16 Hz. Validated on the public MAUS dataset against ECG and
+  NeuroKit2 (`examples/ppg_maus_validation/`). See `docs/modalities/ppg.md`.
 
 ### Fixed
 

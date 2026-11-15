@@ -1,7 +1,7 @@
 # MultimodalPhysioKit for MATLAB
 
 The MATLAB implementation exposes the `mpk` package, input adapters, plotting
-utilities, and processors for ECG, EDA, respiration, temperature, and fNIRS.
+utilities, and processors for ECG, EDA, respiration, temperature, PPG, and fNIRS.
 
 ## Setup
 

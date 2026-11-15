@@ -283,6 +283,17 @@ processor = TemperatureProcessor()
 result = processor.process(temperature_signal)
 ```
 
+For a completed real-time PPG window (shorter than the 60 s needed by HRV
+frequency analysis):
+
+```python
+from multimodalphysiokit.processors import PPGProcessor
+
+processor = PPGProcessor(label_frequency_analysis=None)
+result = processor.process(ppg_window)
+result.features["ppg_bpm_mean"], result.metadata["n_valid_pulses"]
+```
+
 For paired inputs:
 
 ```python

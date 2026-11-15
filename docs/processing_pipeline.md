@@ -89,7 +89,7 @@ boundaries from preprocessing a parent signal and slicing afterward.
 | EDA | downsampling, filtering, cvxEDA decomposition, SCR processing |
 | Respiration | downsampling, filtering, extrema and breath pairing |
 | Temperature | low-pass filtering, artifact screening, derivative features |
-| PPG | band-pass beat detection, pulse feet/peaks and quality check, pulse-shape, HRV and frequency analysis |
+| PPG | 0.5-8 Hz cleaning, band-pass beat detection without dicrotic-notch feet, first systolic peak, pulse quality check, pulse-shape, HRV and frequency analysis |
 | fNIRS | paired-current downsampling/filtering, baseline scalars, concentration conversion |
 
 In MATLAB, each processor is an object-facing adapter over its modality's

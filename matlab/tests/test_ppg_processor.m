@@ -17,9 +17,10 @@ signal = localPpg(repmat(0.8,1,150));          % 75 bpm, 120 s
 result = mpk.PPGProcessor('LabelFrequencyAnalysis',[]).process(signal);
 verifyEqual(testCase,localFeature(result,'ppg_bpm_mean'),75,'AbsTol',1e-6)
 verifyEqual(testCase,localFeature(result,'ppg_bpm_std'),0,'AbsTol',1e-6)
-% The 0.5 Hz high-pass of the cleaned signal trims amplitude slightly (~0.2 %).
-verifyEqual(testCase,localFeature(result,'ppg_pulse_amplitude_mean'),1,'RelTol',0.01)
-verifyEqual(testCase,localFeature(result,'ppg_rise_time_mean'),0.15,'AbsTol',0.01)
+% The 0.5-8 Hz cleaning trims amplitude slightly (~1 %) and rounds the sharp
+% synthetic foot, which moves it up to 2 samples earlier.
+verifyEqual(testCase,localFeature(result,'ppg_pulse_amplitude_mean'),1,'RelTol',0.02)
+verifyEqual(testCase,localFeature(result,'ppg_rise_time_mean'),0.15,'AbsTol',0.02)
 verifyEqual(testCase,localFeature(result,'ppg_pulse_duration_mean'),0.8,'AbsTol',0.01)
 verifyEqual(testCase,localFeature(result,'ppg_pnn50'),0)
 end
@@ -50,7 +51,8 @@ onsets = result.Intermediates.pulse_onset_indices;
 rejectedOnsetTimes = signal.Time(onsets(~valid));
 verifyEqual(testCase,rejectedOnsetTimes,50*0.8,'AbsTol',0.05)
 verifyEqual(testCase,result.Metadata.n_accepted_ibis,numel(valid) - 1 - 2)
-verifyEqual(testCase,localFeature(result,'ppg_bpm_std'),0,'AbsTol',1e-6)
+% Neighbouring beats may shift by one sample (band-pass spreads the bad pulse).
+verifyLessThan(testCase,localFeature(result,'ppg_bpm_std'),0.5)
 end
 
 function testPulseShapeIsMeasuredOnDriftFreeCleanedSignal(testCase)
@@ -65,6 +67,76 @@ verifyGreaterThanOrEqual(testCase,result.Metadata.n_valid_pulses, ...
 verifyEqual(testCase,localFeature(result,'ppg_rise_time_mean'),0.15,'AbsTol',0.02)
 verifyEqual(testCase,localFeature(result,'ppg_pulse_amplitude_mean'),1,'RelTol',0.05)
 verifyEqual(testCase,numel(result.Intermediates.cleaned_signal),signal.count())
+end
+
+function testIbisAreMeasuredBetweenSystolicPeaks(testCase)
+% Feet every 0.8 s, rise time alternating 0.15 / 0.25 s: systolic peaks are
+% 0.9 / 0.7 s apart, and IBIs must be these peak-to-peak intervals.
+signal = localPpg(repmat(0.8,1,150),repmat([0.15 0.25],1,75));
+result = mpk.PPGProcessor('LabelFrequencyAnalysis',[], ...
+    'ReturnIntermediates',true).process(signal);
+peakTimes = signal.Time(result.Intermediates.pulse_peak_indices);
+expected = diff(peakTimes);
+ibi = result.Intermediates.ibi;
+verifyEqual(testCase,ibi,expected(1:numel(ibi)),'AbsTol',1e-9)
+% The 8 Hz low-pass can move these asymmetric peaks by one sample (10 ms).
+verifyEqual(testCase,ibi(1:2:end),repmat(ibi(1),ceil(numel(ibi)/2),1),'AbsTol',1e-9)
+verifyEqual(testCase,sort(ibi(1:2)),[0.7; 0.9],'AbsTol',0.01 + 1e-9)
+verifyEqual(testCase,localFeature(result,'ppg_pnn50'),1,'AbsTol',1e-12)
+end
+
+function testMaxPeakPositionControlsLatePeakRule(testCase)
+% Rounded, well-formed pulses with the peak at 55 % of the pulse.
+fs = 100; n = 80; r = 44;
+tau = (0:n-1)';
+pulse = 0.5 + 0.5*cos(pi*(tau - r)/(n - r));
+pulse(tau < r) = 0.5 - 0.5*cos(pi*tau(tau < r)/r);
+samples = [repmat(pulse,150,1); 0];
+signal = mpk.Signal(samples,(0:numel(samples)-1)'/fs,fs,'ppg','a.u.');
+verifyError(testCase,@() mpk.PPGProcessor('LabelFrequencyAnalysis',[]).process(signal), ...
+    'MultimodalPhysioKit:PPG:TooFewPulses')
+result = mpk.PPGProcessor('LabelFrequencyAnalysis',[], ...
+    'MaxPeakPosition',0.65).process(signal);
+verifyEqual(testCase,result.Metadata.n_valid_pulses,result.Metadata.n_pulses)
+% Rounded peaks can land one sample apart, so IBIs are exact to one sample.
+verifyEqual(testCase,localFeature(result,'ppg_bpm_mean'),75,'AbsTol',0.1)
+verifyError(testCase,@() mpk.PPGProcessor('MaxPeakPosition',1.5), ...
+    'mpk:PPGProcessor:InvalidMaxPeakPosition')
+end
+
+function testDicroticWaveDoesNotSplitThePulse(testCase)
+% Systolic wave at 0.15 s and a dicrotic wave half as tall at 0.45 s, one
+% beat every 0.8 s: the notch between them is not a pulse foot.
+signal = localTwoHumpPpg(1.0,0.5,0.15,0.45);
+result = mpk.PPGProcessor('LabelFrequencyAnalysis',[], ...
+    'ReturnIntermediates',true).process(signal);
+verifyGreaterThanOrEqual(testCase,result.Metadata.n_pulses,145)
+verifyGreaterThanOrEqual(testCase,result.Metadata.n_valid_pulses, ...
+    result.Metadata.n_pulses - 2)
+verifyEqual(testCase,result.Intermediates.ibi, ...
+    repmat(0.8,size(result.Intermediates.ibi)),'AbsTol',0.011)
+end
+
+function testSystolicPeakIsTheFirstHumpEvenWhenALaterOneIsTaller(testCase)
+% Wrist-like pulse: systolic hump (0.85) at 0.15 s, taller late hump (1.0)
+% at 0.32 s. The systolic peak is the first hump, not the global maximum.
+signal = localTwoHumpPpg(0.85,1.0,0.15,0.32);
+result = mpk.PPGProcessor('LabelFrequencyAnalysis',[], ...
+    'ReturnIntermediates',true).process(signal);
+peakTimes = signal.Time(result.Intermediates.pulse_peak_indices);
+verifyEqual(testCase,mod(peakTimes,0.8),repmat(0.15,size(peakTimes)),'AbsTol',0.02)
+end
+
+function testCleaningRemovesContentAbove8Hz(testCase)
+% A 30 Hz interference must not reach the cleaned signal.
+clean = localPpg(repmat(0.8,1,150));
+noisy = mpk.Signal(clean.Samples + 0.05*sin(2*pi*30*clean.Time), ...
+    clean.Time,100,'ppg','a.u.');
+processor = mpk.PPGProcessor('LabelFrequencyAnalysis',[],'ReturnIntermediates',true);
+reference = processor.process(clean);
+result = processor.process(noisy);
+difference = result.Intermediates.cleaned_signal - reference.Intermediates.cleaned_signal;
+verifyLessThan(testCase,max(abs(difference(201:end-200))),0.005)
 end
 
 function testShortRealTimeWindowWithoutFrequencyAnalysis(testCase)
@@ -117,6 +189,16 @@ end
 samples = [samples; 0];
 time = (0:numel(samples)-1)'/fs;
 signal = mpk.Signal(samples,time,fs,'ppg','a.u.');
+end
+
+function signal = localTwoHumpPpg(first,second,firstAt,secondAt)
+% 150 pulses of two Gaussian humps (width 50 ms), one every 0.8 s.
+fs = 100;
+tau = (0:79)'/fs;
+pulse = first*exp(-0.5*((tau - firstAt)/0.05).^2) + ...
+    second*exp(-0.5*((tau - secondAt)/0.05).^2);
+samples = [repmat(pulse,150,1); 0];
+signal = mpk.Signal(samples,(0:numel(samples)-1)'/fs,fs,'ppg','a.u.');
 end
 
 function ibis = localRsaIbis(durationSeconds)

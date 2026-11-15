@@ -10,7 +10,8 @@ physiological signals in offline postprocessing and window-based real-time
 pipelines.
 
 The library provides plug-and-play processing objects for ECG,
-electrodermal activity, respiration, skin temperature, and fNIRS. Each
+electrodermal activity, respiration, skin temperature, photoplethysmography
+(PPG), and fNIRS. Each
 processor operates on standardized `Signal` objects and is independent of the
 original data source, allowing the same processing pipeline to be used with
 in-memory arrays, generic HDF5 datasets, BioSignalsPlux/OpenSignals recordings,
@@ -290,7 +291,10 @@ Python 3.10 or newer is required. EDA uses external cvxEDA. See
 
 Run Python tests from `python/` with `python -m pytest -v`. See
 [Validation](docs/validation.md), [local validation](docs/local_validation.md),
-and [CITATION.cff](CITATION.cff). Scientific background for the supported
+and [CITATION.cff](CITATION.cff). The PPG processor is additionally
+validated against ECG and NeuroKit2 on the public MAUS dataset
+([results](docs/modalities/ppg.md#validation-on-maus),
+[script](examples/ppg_maus_validation/validate_ppg_maus.py)). Scientific background for the supported
 modalities includes the publications linked by the citation metadata and the
 cvxEDA reference in the
 [third-party notices](docs/legal/THIRD_PARTY_NOTICES.md). The package is a

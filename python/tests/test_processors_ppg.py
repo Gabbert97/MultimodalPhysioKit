@@ -58,9 +58,10 @@ def test_constant_rate_recovers_known_pulse_shape_and_heart_rate():
 
     assert features["ppg_bpm_mean"] == pytest.approx(75.0, abs=1e-6)
     assert features["ppg_bpm_std"] == pytest.approx(0.0, abs=1e-6)
-    # The 0.5 Hz high-pass of the cleaned signal trims amplitude slightly (~0.2 %).
-    assert features["ppg_pulse_amplitude_mean"] == pytest.approx(AMPLITUDE, rel=0.01)
-    assert features["ppg_rise_time_mean"] == pytest.approx(RISE_TIME, abs=1 / FS)
+    # The 0.5-8 Hz cleaning trims amplitude slightly (~1 %) and rounds the sharp
+    # synthetic foot, which moves it up to 2 samples earlier.
+    assert features["ppg_pulse_amplitude_mean"] == pytest.approx(AMPLITUDE, rel=0.02)
+    assert features["ppg_rise_time_mean"] == pytest.approx(RISE_TIME, abs=2 / FS)
     assert features["ppg_pulse_duration_mean"] == pytest.approx(0.8, abs=1 / FS)
     assert features["ppg_pnn50"] == 0.0
 
@@ -104,8 +105,10 @@ def test_malformed_pulse_is_rejected_and_its_intervals_are_skipped():
     np.testing.assert_allclose(rejected_onsets, [50 * 0.8], atol=0.05)
     # The two intervals touching the rejected pulse are skipped, not imputed.
     assert result.metadata["n_accepted_ibis"] == valid.size - 1 - 2
-    assert result.features["ppg_bpm_std"] == pytest.approx(0.0, abs=1e-6)
-    assert result.features["ppg_rise_time_mean"] == pytest.approx(RISE_TIME, abs=1 / FS)
+    # Neighbouring beats may shift by one sample (band-pass spreads the bad pulse).
+    assert result.features["ppg_bpm_std"] < 0.5
+    # The 8 Hz low-pass rounds the sharp synthetic foot by up to 2 samples.
+    assert result.features["ppg_rise_time_mean"] == pytest.approx(RISE_TIME, abs=2 / FS)
 
 
 def test_short_real_time_window_without_frequency_analysis():
@@ -176,7 +179,7 @@ def test_invalid_inputs_raise_clear_errors():
     with pytest.raises(ValueError, match="output_dir"):
         process_ppg(make_ppg([0.8] * 20), label_frequency_analysis=None, save_plots=True)
     slow = Signal(np.zeros(100), np.arange(100) / 5.0, 5.0)
-    with pytest.raises(ValueError, match="6 Hz"):
+    with pytest.raises(ValueError, match="16 Hz"):
         process_ppg(slow, label_frequency_analysis=None)
     flat = Signal(np.zeros(2000), np.arange(2000) / FS, FS)
     with pytest.raises(ValueError, match="too few"):
@@ -198,3 +201,97 @@ def test_pulse_shape_is_measured_on_drift_free_cleaned_signal():
     assert result.features["ppg_rise_time_mean"] == pytest.approx(RISE_TIME, abs=0.02)
     assert result.features["ppg_pulse_amplitude_mean"] == pytest.approx(AMPLITUDE, rel=0.05)
     assert result.intermediates["cleaned_signal"].size == signal.n_samples
+
+
+def test_ibis_are_measured_between_systolic_peaks():
+    # Feet every 0.8 s, rise time alternating 0.15 / 0.25 s: the systolic peaks
+    # are therefore 0.9 / 0.7 s apart. IBIs must be peak-to-peak intervals.
+    ibis = [0.8] * 150
+    rises = [0.15, 0.25] * 75
+    signal = make_ppg(ibis, rise_times=rises)
+
+    result = process_ppg(signal, label_frequency_analysis=None, return_intermediates=True)
+
+    peak_times = signal.time[result.intermediates["pulse_peak_indices"]]
+    expected = np.diff(peak_times)[: result.intermediates["ibi"].size]
+    np.testing.assert_allclose(result.intermediates["ibi"], expected, atol=1e-9)
+    # The 8 Hz low-pass can move these asymmetric peaks by one sample (10 ms).
+    ibi = result.intermediates["ibi"]
+    np.testing.assert_allclose(ibi[::2], ibi[0], atol=1e-9)
+    np.testing.assert_allclose(sorted([ibi[0], ibi[1]]), [0.7, 0.9], atol=1 / FS + 1e-9)
+    assert result.features["ppg_pnn50"] == pytest.approx(1.0)   # every difference is 200 ms
+
+
+def _symmetric_ppg(n_beats=150, ibi=0.8, peak_fraction=0.55):
+    """Rounded, well-formed pulses whose peak sits at 55 % of the pulse."""
+    n = int(ibi * FS)
+    r = int(peak_fraction * n)
+    tau = np.arange(n, dtype=float)
+    pulse = np.where(tau < r, 0.5 - 0.5 * np.cos(np.pi * tau / r),
+                     0.5 + 0.5 * np.cos(np.pi * (tau - r) / (n - r)))
+    samples = np.concatenate([pulse] * n_beats + [np.zeros(1)])
+    return Signal(samples, np.arange(samples.size) / FS, FS)
+
+
+def test_max_peak_position_controls_the_late_peak_rule():
+    signal = _symmetric_ppg()
+
+    with pytest.raises(ValueError, match="too few valid"):
+        process_ppg(signal, label_frequency_analysis=None)  # default 0.5 rejects them
+
+    result = process_ppg(signal, label_frequency_analysis=None, max_peak_position=0.65)
+    assert result.metadata["n_valid_pulses"] == result.metadata["n_pulses"]
+    # Rounded peaks can land one sample apart, so IBIs are exact to one sample.
+    assert result.features["ppg_bpm_mean"] == pytest.approx(75.0, abs=0.1)
+
+
+def _two_hump_ppg(first, second, first_at, second_at, n_beats=150, ibi=0.8):
+    """Pulses made of two Gaussian humps (width 50 ms) at known times after the beat start."""
+    tau = np.arange(int(ibi * FS)) / FS
+    pulse = (first * np.exp(-0.5 * ((tau - first_at) / 0.05) ** 2)
+             + second * np.exp(-0.5 * ((tau - second_at) / 0.05) ** 2))
+    samples = np.concatenate([pulse] * n_beats + [np.zeros(1)])
+    return Signal(samples, np.arange(samples.size) / FS, FS)
+
+
+def test_dicrotic_wave_does_not_split_the_pulse():
+    # Systolic wave at 0.15 s and a dicrotic wave half as tall at 0.45 s, one
+    # beat every 0.8 s (75 bpm). The notch between them is not a pulse foot:
+    # every beat must be one accepted pulse and every IBI 0.8 s.
+    signal = _two_hump_ppg(1.0, 0.5, 0.15, 0.45)
+
+    result = process_ppg(signal, label_frequency_analysis=None, return_intermediates=True)
+
+    assert result.metadata["n_pulses"] >= 145
+    assert result.metadata["n_valid_pulses"] >= result.metadata["n_pulses"] - 2
+    np.testing.assert_allclose(result.intermediates["ibi"], 0.8, atol=0.011)
+
+
+def test_systolic_peak_is_the_first_hump_even_when_a_later_one_is_taller():
+    # Wrist-like pulse: systolic hump (0.85) at 0.15 s, taller late hump (1.0)
+    # at 0.32 s. The systolic peak is the first hump, not the global maximum.
+    signal = _two_hump_ppg(0.85, 1.0, 0.15, 0.32)
+
+    result = process_ppg(signal, label_frequency_analysis=None, return_intermediates=True)
+
+    peak_times = signal.time[result.intermediates["pulse_peak_indices"]]
+    np.testing.assert_allclose(np.mod(peak_times, 0.8), 0.15, atol=0.02)
+
+
+def test_cleaning_removes_content_above_8_hz():
+    # A 30 Hz interference must not reach the cleaned signal on which pulse
+    # characteristics are measured.
+    clean = make_ppg([0.8] * 150)
+    noisy = Signal(clean.samples + 0.05 * np.sin(2 * np.pi * 30 * clean.time), clean.time, FS)
+
+    reference = process_ppg(clean, label_frequency_analysis=None, return_intermediates=True)
+    result = process_ppg(noisy, label_frequency_analysis=None, return_intermediates=True)
+
+    difference = result.intermediates["cleaned_signal"] - reference.intermediates["cleaned_signal"]
+    assert np.max(np.abs(difference[200:-200])) < 0.005
+
+
+@pytest.mark.parametrize("value", [0.0, 1.5, "0.5", float("nan")])
+def test_invalid_max_peak_position_is_rejected(value):
+    with pytest.raises((ValueError, TypeError), match="max_peak_position"):
+        PPGProcessor(max_peak_position=value)

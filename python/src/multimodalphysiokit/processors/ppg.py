@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from numbers import Real
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 from scipy.signal import butter, filtfilt, find_peaks
 
 from multimodalphysiokit.core import ProcessingResult, Signal
@@ -14,6 +16,9 @@ from .ecg import (
     _plot_ecg_bpm_trend,
 )
 
+# Cleaning band: 0.5 Hz removes baseline drift, 8 Hz removes noise above the
+# pulse harmonics. All pulse characteristics are measured on this signal.
+_CLEAN_BAND_HZ = (0.5, 8.0)
 # Beat-detection band: 0.5-3.0 Hz covers 30-180 bpm and removes breathing drift.
 _BAND_HZ = (0.5, 3.0)
 _FILTER_ORDER = 3
@@ -23,9 +28,19 @@ _MIN_BPM = 40.0
 # trough distance: 10 % before and 30 % after.
 _FOOT_SEARCH_BEFORE = 0.1
 _FOOT_SEARCH_AFTER = 0.3
+# A band-pass trough is a foot only if its prominence is at least 30 % of the
+# 75th percentile of the prominences of up to 11 neighbouring troughs; the
+# shallower dicrotic notch therefore does not split a pulse.
+_FOOT_MIN_RELATIVE_PROMINENCE = 0.3
+_FOOT_PROMINENCE_PERCENTILE = 75.0
+# Systolic peak: the first local maximum of the pulse whose height above the
+# foot-to-foot line is at least 70 % of the highest local maximum.
+_PEAK_MIN_RELATIVE_HEIGHT = 0.7
 # Pulse quality: duration within 0.8-1.2 x the running median duration of up
-# to 11 neighbouring pulses, and systolic peak in the first half of the pulse.
+# to 11 neighbouring pulses, and systolic peak within the first
+# max_peak_position fraction of the pulse (default: first half).
 _DURATION_TOLERANCE = (0.8, 1.2)
+_DEFAULT_MAX_PEAK_POSITION = 0.5
 _RUNNING_MEDIAN_HALF_WIDTH = 5
 _MIN_FREQUENCY_SECONDS = 60.0
 
@@ -42,6 +57,10 @@ class PPGProcessor:
     ``label_frequency_analysis`` selects HRV frequency analysis: ``1`` STFT,
     ``2`` PSD (both need at least 60 s), or ``None`` to skip it so short
     windows can be processed.
+
+    ``max_peak_position`` is the latest accepted systolic-peak position as a
+    fraction of the pulse (default 0.5, the first half). Rounded wrist PPG
+    pulses may need a larger value, e.g. 0.65.
     """
 
     def __init__(
@@ -49,6 +68,7 @@ class PPGProcessor:
         *,
         label_frequency_analysis: int | None = 1,
         return_intermediates: bool = False,
+        max_peak_position: float = _DEFAULT_MAX_PEAK_POSITION,
     ) -> None:
         if label_frequency_analysis not in (None, 1, 2):
             raise ValueError("label_frequency_analysis must be None, 1, or 2")
@@ -56,6 +76,7 @@ class PPGProcessor:
             raise TypeError("return_intermediates must be a boolean")
         self.label_frequency_analysis = label_frequency_analysis
         self.return_intermediates = return_intermediates
+        self.max_peak_position = _validate_max_peak_position(max_peak_position)
 
     def process(
         self,
@@ -77,7 +98,7 @@ class PPGProcessor:
                 "use label_frequency_analysis=None for shorter signals"
             )
 
-        pulses = detect_ppg_pulses(signal)
+        pulses = detect_ppg_pulses(signal, max_peak_position=self.max_peak_position)
         ibi = _accepted_ibis(signal.time, pulses)
         if np.count_nonzero(pulses["valid"]) < 3 or ibi["values"].size < 3:
             raise ValueError("too few valid PPG pulses were detected")
@@ -153,6 +174,7 @@ class PPGProcessor:
                 "start_time_seconds": float(signal.time[0]),
                 "end_time_seconds": float(signal.time[-1]),
                 "frequency_analysis_method": self.label_frequency_analysis,
+                "max_peak_position": self.max_peak_position,
                 "n_pulses": int(pulses["valid"].size),
                 "n_valid_pulses": int(np.count_nonzero(pulses["valid"])),
                 "n_accepted_ibis": int(ibi["values"].size),
@@ -166,6 +188,7 @@ def process_ppg(
     *,
     label_frequency_analysis: int | None = 1,
     return_intermediates: bool = False,
+    max_peak_position: float = _DEFAULT_MAX_PEAK_POSITION,
     show_plots: bool = False,
     save_plots: bool = False,
     output_dir: str | Path | None = None,
@@ -176,6 +199,7 @@ def process_ppg(
     return PPGProcessor(
         label_frequency_analysis=label_frequency_analysis,
         return_intermediates=return_intermediates,
+        max_peak_position=max_peak_position,
     ).process(
         signal,
         show_plots=show_plots,
@@ -185,13 +209,20 @@ def process_ppg(
     )
 
 
-def detect_ppg_pulses(signal: Signal) -> dict[str, np.ndarray]:
+def detect_ppg_pulses(
+    signal: Signal,
+    *,
+    max_peak_position: float = _DEFAULT_MAX_PEAK_POSITION,
+) -> dict[str, np.ndarray]:
     """Return pulse onsets (feet), systolic peaks, per-pulse features and validity.
 
-    Beats are located on the 0.5-3.0 Hz band-passed signal; all pulse
-    characteristics (feet, peaks, amplitude, duration, rise time) are measured
-    on the cleaned signal, i.e. the PPG with only the 0.5 Hz high-pass applied,
-    which removes baseline drift but keeps the pulse morphology.
+    Beats are located on the 0.5-3.0 Hz band-passed signal, keeping only
+    troughs deep enough not to be a dicrotic notch; all pulse characteristics
+    (feet, peaks, amplitude, duration, rise time) are measured on the cleaned
+    signal, i.e. the PPG band-passed at 0.5-8 Hz, which removes baseline drift
+    and noise but keeps the pulse morphology. The systolic peak is the first
+    local maximum reaching 70 % of the pulse's highest one. IBIs are measured
+    between systolic peaks.
 
     Pulse ``k`` spans ``onsets[k]`` to ``onsets[k + 1]``; all index arrays are
     zero-based sample indexes into ``signal``.
@@ -200,7 +231,16 @@ def detect_ppg_pulses(signal: Signal) -> dict[str, np.ndarray]:
     fs = signal.sampling_frequency
     cleaned, filtered = _clean_and_bandpass(signal.samples, fs)
 
-    troughs, _ = find_peaks(-filtered, distance=max(1, _matlab_round(fs * 60 / _MAX_BPM)))
+    troughs, properties = find_peaks(
+        -filtered, distance=max(1, _matlab_round(fs * 60 / _MAX_BPM)), prominence=0
+    )
+    prominences = properties["prominences"]
+    local_prominence = _centered_window_stat(
+        prominences,
+        _RUNNING_MEDIAN_HALF_WIDTH,
+        lambda values, axis=None: np.percentile(values, _FOOT_PROMINENCE_PERCENTILE, axis=axis),
+    )
+    troughs = troughs[prominences >= _FOOT_MIN_RELATIVE_PROMINENCE * local_prominence]
     if troughs.size < 3:
         raise ValueError("too few PPG pulses were detected")
     onsets = _refine_feet(cleaned, troughs)
@@ -208,10 +248,8 @@ def detect_ppg_pulses(signal: Signal) -> dict[str, np.ndarray]:
         raise ValueError("too few PPG pulses were detected")
 
     starts, stops = onsets[:-1], onsets[1:]
-    peaks = np.asarray(
-        [start + int(np.argmax(cleaned[start : stop + 1])) for start, stop in zip(starts, stops)],
-        dtype=int,
-    )
+    peaks = _first_systolic_peaks(cleaned, starts, stops)
+    max_peak_position = _validate_max_peak_position(max_peak_position)
     time = signal.time
     durations = time[stops] - time[starts]
     rise_times = time[peaks] - time[starts]
@@ -224,7 +262,7 @@ def detect_ppg_pulses(signal: Signal) -> dict[str, np.ndarray]:
         & (durations <= _DURATION_TOLERANCE[1] * reference)
         & (peaks > starts)
         & (peaks < stops)
-        & (peaks - starts <= (stops - starts) / 2)
+        & (peaks - starts <= max_peak_position * (stops - starts))
     )
     return {
         "cleaned_signal": cleaned,
@@ -239,18 +277,46 @@ def detect_ppg_pulses(signal: Signal) -> dict[str, np.ndarray]:
 
 
 def _clean_and_bandpass(samples: np.ndarray, fs: float) -> tuple[np.ndarray, np.ndarray]:
-    """Return (cleaned, band-passed): 0.5 Hz high-pass, then 3.0 Hz low-pass of it."""
+    """Return (cleaned, band-passed): 0.5 Hz high-pass, then 8.0 Hz / 3.0 Hz low-pass of it."""
 
-    if _BAND_HZ[1] >= fs / 2:
-        raise ValueError("sampling_frequency must exceed 6 Hz for 0.5-3.0 Hz PPG filtering")
+    if _CLEAN_BAND_HZ[1] >= fs / 2:
+        raise ValueError("sampling_frequency must exceed 16 Hz for 0.5-8.0 Hz PPG filtering")
     try:
         # padlen matches MATLAB filtfilt (3 * filter order) for cross-language parity.
-        b, a = butter(_FILTER_ORDER, _BAND_HZ[0], btype="high", fs=fs)
-        cleaned = filtfilt(b, a, samples, padlen=3 * _FILTER_ORDER)
+        b, a = butter(_FILTER_ORDER, _CLEAN_BAND_HZ[0], btype="high", fs=fs)
+        high_passed = filtfilt(b, a, samples, padlen=3 * _FILTER_ORDER)
+        b, a = butter(_FILTER_ORDER, _CLEAN_BAND_HZ[1], btype="low", fs=fs)
+        cleaned = filtfilt(b, a, high_passed, padlen=3 * _FILTER_ORDER)
         b, a = butter(_FILTER_ORDER, _BAND_HZ[1], btype="low", fs=fs)
-        return cleaned, filtfilt(b, a, cleaned, padlen=3 * _FILTER_ORDER)
+        return cleaned, filtfilt(b, a, high_passed, padlen=3 * _FILTER_ORDER)
     except ValueError as exc:
         raise ValueError("PPG signal is too short for filtering") from exc
+
+
+def _first_systolic_peaks(cleaned: np.ndarray, starts: np.ndarray, stops: np.ndarray) -> np.ndarray:
+    """First local maximum of each pulse reaching 70 % of its highest one.
+
+    Heights are measured above the foot-to-foot line. A local maximum is a
+    sample higher than the previous one and not lower than the next one; a
+    pulse without one falls back to its global maximum.
+    """
+
+    is_max = np.zeros(cleaned.size, dtype=bool)
+    is_max[1:-1] = (cleaned[1:-1] > cleaned[:-2]) & (cleaned[1:-1] >= cleaned[2:])
+    candidates = np.flatnonzero(is_max)
+    first = np.searchsorted(candidates, starts, side="right")
+    last = np.searchsorted(candidates, stops, side="left")
+    peaks = np.empty(starts.size, dtype=int)
+    for k, (start, stop) in enumerate(zip(starts, stops)):
+        inside = candidates[first[k] : last[k]]
+        if inside.size:
+            baseline = cleaned[start] + (cleaned[stop] - cleaned[start]) * ((inside - start) / (stop - start))
+            height = cleaned[inside] - baseline
+            if height.max() > 0:
+                peaks[k] = inside[np.argmax(height >= _PEAK_MIN_RELATIVE_HEIGHT * height.max())]
+                continue
+        peaks[k] = start + int(np.argmax(cleaned[start : stop + 1]))
+    return peaks
 
 
 def _refine_feet(cleaned: np.ndarray, troughs: np.ndarray) -> np.ndarray:
@@ -274,12 +340,27 @@ def _matlab_round(value: float) -> int:
 
 
 def _running_median(values: np.ndarray, half_width: int) -> np.ndarray:
-    return np.asarray(
-        [
-            np.median(values[max(0, k - half_width) : k + half_width + 1])
-            for k in range(values.size)
-        ]
-    )
+    return _centered_window_stat(values, half_width, np.median)
+
+
+def _centered_window_stat(values: np.ndarray, half_width: int, stat) -> np.ndarray:
+    """``stat`` of each value's centred window, shrunk at the edges.
+
+    Equivalent to ``stat(values[max(0, k - h) : k + h + 1])`` for every ``k``;
+    full windows are computed in one vectorised call.
+    """
+
+    values = np.asarray(values, dtype=float)
+    n, width = values.size, 2 * half_width + 1
+    result = np.empty(n)
+    if n >= width:
+        result[half_width : n - half_width] = stat(sliding_window_view(values, width), axis=1)
+        edges = [*range(half_width), *range(n - half_width, n)]
+    else:
+        edges = range(n)
+    for k in edges:
+        result[k] = stat(values[max(0, k - half_width) : k + half_width + 1])
+    return result
 
 
 def _accepted_ibis(time: np.ndarray, pulses: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
@@ -289,8 +370,8 @@ def _accepted_ibis(time: np.ndarray, pulses: dict[str, np.ndarray]) -> dict[str,
     rejected intervals are skipped, never imputed.
     """
 
-    peak_times = time[pulses["peaks"]]
-    intervals = np.diff(peak_times)
+    beat_times = time[pulses["peaks"]]
+    intervals = np.diff(beat_times)
     valid = pulses["valid"]
     with np.errstate(divide="ignore"):
         bpm = 60 / intervals
@@ -298,8 +379,8 @@ def _accepted_ibis(time: np.ndarray, pulses: dict[str, np.ndarray]) -> dict[str,
     accepted = flags != 0
     return {
         "values": intervals[accepted],
-        "start_times": peak_times[:-1][accepted],
-        "end_times": peak_times[1:][accepted],
+        "start_times": beat_times[:-1][accepted],
+        "end_times": beat_times[1:][accepted],
         "flags": flags,
     }
 
@@ -325,6 +406,15 @@ def _pulse_features(pulses: dict[str, np.ndarray]) -> dict[str, float]:
         features[f"{name}_std"] = float(np.std(values, ddof=1))
         features[f"{name}_median"] = float(np.median(values))
     return features
+
+
+def _validate_max_peak_position(value) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError("max_peak_position must be a number")
+    value = float(value)
+    if not np.isfinite(value) or not 0 < value <= 1:
+        raise ValueError("max_peak_position must be in (0, 1]")
+    return value
 
 
 def _ppg_name(ecg_feature_name: str) -> str:
@@ -367,7 +457,7 @@ def _plot_ppg_pulses(
     axes[1].plot(time[onsets], cleaned[onsets], "v", color="k", label="foot")
     axes[1].plot(time[peaks[valid]], cleaned[peaks[valid]], "o", color="tab:blue", label="accepted peak")
     axes[1].plot(time[peaks[~valid]], cleaned[peaks[~valid]], "x", color="tab:red", label="rejected pulse")
-    axes[1].set_ylabel("Cleaned PPG (>0.5 Hz)")
+    axes[1].set_ylabel("Cleaned PPG (0.5-8 Hz)")
     axes[1].legend(loc="upper right")
     axes[2].plot(time, pulses["filtered_signal"], linewidth=1)
     axes[2].set_ylabel("Band-pass 0.5-3.0 Hz")

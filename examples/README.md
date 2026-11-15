@@ -93,6 +93,20 @@ is an advanced example comparing final feature extraction in both languages
 from the same tracked synthetic recording. A small MATLAB script exports the
 reference features; the notebook runs Python and presents the comparison.
 
+## PPG validation on MAUS
+
+[`ppg_maus_validation/validate_ppg_maus.py`](ppg_maus_validation/validate_ppg_maus.py)
+compares the PPG processor with ECG R-peaks and NeuroKit2 on the public MAUS
+dataset (fingertip and wrist PPG). Download MAUS separately, install
+`neurokit2`, and pass the folder with the participant directories:
+
+```bash
+python examples/ppg_maus_validation/validate_ppg_maus.py /path/to/MAUS/Data/Raw_data
+```
+
+Results go to the git-ignored `validation-output/ppg_maus/`; the summary is
+reported in [docs/modalities/ppg.md](../docs/modalities/ppg.md#validation-on-maus).
+
 ## Temporal phases
 
 The bundled synthetic file has no protocol annotations. The notebooks

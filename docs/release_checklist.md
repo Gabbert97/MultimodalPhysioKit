@@ -26,6 +26,9 @@ private archive; its Git history is never transferred to the public repository.
       documented optional-dependency assumptions.
 - [ ] Confirm the MATLAB/Python cross-language validation passes for ECG, EDA,
       respiration, temperature, and fNIRS.
+- [ ] If PPG processing changed, rerun
+      `examples/ppg_maus_validation/validate_ppg_maus.py` on MAUS and update
+      the tables in `docs/modalities/ppg.md`.
 - [ ] Run `python tools/generate_synthetic_sample.py --check` successfully.
 - [ ] Build the Python sdist and wheel with
       `python -m build python --outdir dist`.
