@@ -2,7 +2,7 @@
 
 Notable changes to MultimodalPhysioKit are documented in this file.
 
-## [Unreleased]
+## [0.3.0]
 
 All changes below apply to both Python and MATLAB unless stated otherwise.
 

@@ -23,7 +23,7 @@ flow.
 
 ## Installation
 
-MultimodalPhysioKit v0.1.0 is available from
+MultimodalPhysioKit is available from
 [PyPI](https://pypi.org/project/multimodalphysiokit/):
 
 ```bash
