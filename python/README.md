@@ -1,5 +1,9 @@
 # MultimodalPhysioKit Python guide
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Gabbert97/MultimodalPhysioKit/main/docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
+</p>
+
 MultimodalPhysioKit's Python processing layer is input-agnostic. Standardized
 `Signal` objects flow into reusable modality processors and produce
 `ProcessingResult` objects:

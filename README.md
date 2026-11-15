@@ -1,5 +1,9 @@
 # MultimodalPhysioKit
 
+<p align="center">
+  <img src="docs/assets/multimodalphysiokit-demo.gif" alt="MultimodalPhysioKit: simulated multimodal signals processed into feature categories" width="100%">
+</p>
+
 [![Python CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/python-ci.yml)
 [![MATLAB CI](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml/badge.svg?branch=main)](https://github.com/Gabbert97/MultimodalPhysioKit/actions/workflows/matlab-ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/multimodalphysiokit.svg)](https://pypi.org/project/multimodalphysiokit/)
