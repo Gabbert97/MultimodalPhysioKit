@@ -165,3 +165,33 @@ def test_artifact_rejected_windows_are_excluded_from_feature_extraction():
     assert screened_temperature.size < filtered_phase.size
     assert not np.any((screened_time >= 2.0) & (screened_time < 4.0))
     assert np.all(screened_temperature < 40)
+
+
+def test_smooth_drift_is_kept_whole_for_cooling_and_warming():
+    # A smooth, artifact-free 6 degC drift must not be screened out in
+    # either direction: the delta must be the physical +/-6 degC change.
+    sampling_frequency = 10.0
+    time = np.arange(0, 300, 1 / sampling_frequency)
+    warming = Signal(30 + 6 * time / time[-1], time, sampling_frequency, units="degC")
+    cooling = Signal(36 - 6 * time / time[-1], time, sampling_frequency, units="degC")
+
+    assert process_temperature(warming).features["temperature_delta"] == pytest.approx(6.0, abs=1e-3)
+    assert process_temperature(cooling).features["temperature_delta"] == pytest.approx(-6.0, abs=1e-3)
+
+
+def test_artifact_screening_is_the_same_in_celsius_and_kelvin():
+    # A 1 s, 5 degC sensor-detachment drop on a stable 33 degC signal.
+    # Temperature differences do not depend on the absolute scale, so every
+    # feature except the mean must be identical in degC and K.
+    sampling_frequency = 10.0
+    time = np.arange(0, 300, 1 / sampling_frequency)
+    rng = np.random.default_rng(1)
+    celsius = 33 + 0.01 * rng.standard_normal(time.size)
+    celsius[(time >= 150) & (time < 151)] -= 5
+
+    features_c = process_temperature(Signal(celsius, time, sampling_frequency, units="degC")).features
+    features_k = process_temperature(Signal(celsius + 273.15, time, sampling_frequency, units="K")).features
+
+    for name, value in features_c.items():
+        expected = value + 273.15 if name == "temperature_mean" else value
+        assert features_k[name] == pytest.approx(expected, rel=1e-6, abs=1e-9), name

@@ -252,3 +252,29 @@ def test_plotting_does_not_change_feature_values(tmp_path):
     with_plots = process_respiration(signal, save_plots=True, output_dir=tmp_path)
 
     assert with_plots.features == without_plots.features
+
+
+def test_features_are_unaffected_by_interference_above_new_nyquist():
+    # Breathing at 0.25 Hz sampled at 1000 Hz. A 100.1 Hz component lies
+    # above the 50 Hz Nyquist of the 100 Hz processing rate; plain decimation
+    # would fold it to 0.1 Hz and distort breath detection and amplitudes.
+    sampling_frequency = 1000.0
+    time = np.arange(0, 120, 1 / sampling_frequency)
+    # About 15 breaths/min with natural rate variation (constant rates make
+    # the breath-rate autocorrelation undefined).
+    phase = 2 * np.pi * (0.25 * time + 0.3 * np.sin(2 * np.pi * 0.013 * time))
+    breathing = np.sin(phase)
+    clean = Signal(breathing, time, sampling_frequency, label="rip")
+    noisy = Signal(
+        breathing + 0.5 * np.sin(2 * np.pi * 100.1 * time),
+        time,
+        sampling_frequency,
+        label="rip",
+    )
+
+    clean_features = process_respiration(clean).features
+    noisy_features = process_respiration(noisy).features
+
+    for name in ("respiration_breath_rate_mean", "respiration_amplitude_mean",
+                 "respiration_inspiratory_time_mean", "respiration_expiratory_time_mean"):
+        assert noisy_features[name] == pytest.approx(clean_features[name], rel=1e-3), name

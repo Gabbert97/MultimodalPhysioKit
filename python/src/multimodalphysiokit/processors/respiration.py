@@ -9,6 +9,8 @@ from scipy.signal import butter, filtfilt
 
 from multimodalphysiokit.core import ProcessingResult, Signal
 
+from ._downsampling import antialias_downsample
+
 
 _FS_NEW = 100
 _FEATURE_NAMES = (
@@ -119,7 +121,7 @@ def process_respiration(
 
     _validate_signal(signal)
     downsample_factor = _validate_sampling_frequency(signal.sampling_frequency)
-    respiration_downsampled = signal.samples[::downsample_factor]
+    respiration_downsampled = antialias_downsample(signal.samples, downsample_factor, _FS_NEW)
     time_downsampled = signal.time[::downsample_factor]
     filtered_signal = _filter_respiration_signal(respiration_downsampled)
     feature_values, plot_record = _extract_respiration_features(

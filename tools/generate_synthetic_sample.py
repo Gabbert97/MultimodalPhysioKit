@@ -152,7 +152,7 @@ def _temperature_from_raw(raw: np.ndarray) -> np.ndarray:
         + 2.34282709e-4 * log_resistance
         + 8.77303013e-8 * log_resistance**3
     )
-    return kelvin - 273.5
+    return kelvin - 273.15
 
 
 def _temperature_to_raw(temperature: np.ndarray) -> np.ndarray:

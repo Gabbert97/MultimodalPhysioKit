@@ -47,17 +47,18 @@ def test_invalid_configuration(name, value):
         EDAProcessor(**{name: value})
 
 
-def test_downsampling_values_and_time_are_exact_slices():
+def test_downsampling_keeps_every_tenth_time_and_preserves_in_band_samples():
     signal = make_signal(offset=4.2)
     result = make_processor().downsample_signal(signal)
-    np.testing.assert_array_equal(result["eda"], signal.samples[::10])
+    # In-band content (<= 0.8 Hz) passes the 40 Hz anti-alias filter intact.
+    np.testing.assert_allclose(result["eda"], signal.samples[::10], atol=1e-4)
     np.testing.assert_array_equal(result["time"], signal.time[::10])
     assert result["sampling_frequency"] == 100
 
 
 def test_filtering_matches_existing_helper_exactly():
     signal = make_signal()
-    downsampled = signal.samples[::10]
+    downsampled = make_processor().downsample_signal(signal)["eda"]
     result = make_processor().filter_signal(signal)
     np.testing.assert_allclose(result["eda_filtered"], _filter_eda(downsampled), rtol=0, atol=0)
 
@@ -146,16 +147,50 @@ def test_cache_reuses_identical_signal_and_invalidates_changed_signal(tmp_path):
     assert len(list(tmp_path.glob("eda_*_decomposition.npz"))) == 2
 
 
-def test_cache_can_be_read_by_another_processor(tmp_path):
+def test_cache_is_shared_by_processors_using_the_same_decomposition(tmp_path):
+    signal = make_signal()
+    first = EDAProcessor(decomposition_callable=fake_cvxeda, cache_directory=tmp_path).decompose(signal)
+    second = EDAProcessor(decomposition_callable=fake_cvxeda, cache_directory=tmp_path).decompose(signal)
+    assert len(list(tmp_path.glob("eda_*_decomposition.npz"))) == 1
+    np.testing.assert_array_equal(first["scr"], second["scr"])
+
+
+def test_cache_is_not_reused_by_a_different_decomposition(tmp_path):
     signal = make_signal()
     EDAProcessor(decomposition_callable=fake_cvxeda, cache_directory=tmp_path).decompose(signal)
-    def fail(eda, delta):
-        raise AssertionError("cache should be used")
-    result = EDAProcessor(decomposition_callable=fail, cache_directory=tmp_path).decompose(signal)
-    assert result["scr"].size == 7000
+
+    def other_decomposition(eda, delta):
+        n = len(eda)
+        z = np.zeros(n)
+        return np.full(n, 5.0), z, np.asarray(eda), z, z, z, 0.0
+
+    result = EDAProcessor(
+        decomposition_callable=other_decomposition, cache_directory=tmp_path
+    ).decompose(signal)
+    np.testing.assert_array_equal(result["scr"], 5.0)
 
 
 def test_too_short_filtering_error_is_preserved():
     signal = make_signal(duration=0.02)
     with pytest.raises(ValueError, match="too short for low-pass filtering"):
         make_processor().decompose(signal)
+
+
+def test_downsampling_removes_content_above_new_nyquist_without_aliasing():
+    # 100.2 Hz interference (e.g. a mains harmonic) is above the 50 Hz Nyquist
+    # of the 100 Hz output and would alias to 0.2 Hz, inside the SCR band,
+    # under plain decimation. It must be removed; the 0.05 Hz content kept.
+    sampling_frequency = 1000.0
+    time = np.arange(0, 60, 1 / sampling_frequency)
+    physiological = 2 + 0.3 * np.sin(2 * np.pi * 0.05 * time)
+    interference = 0.5 * np.sin(2 * np.pi * 100.2 * time)
+    signal = Signal(physiological + interference, time, sampling_frequency, label="eda", units="uS")
+
+    downsampled = make_processor().downsample_signal(signal)
+
+    expected = physiological[::10]
+    # Zero-phase filtering leaves a short transient at each boundary;
+    # compare away from the first and last 50 ms.
+    edge = 5
+    np.testing.assert_allclose(downsampled["eda"][edge:-edge], expected[edge:-edge], atol=1e-3)
+    np.testing.assert_array_equal(downsampled["time"], time[::10])

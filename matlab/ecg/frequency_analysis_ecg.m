@@ -77,6 +77,13 @@ stft_context = [];
 if ~isempty(varargin)
     stft_context = varargin{1};
 end
+% Optional per-phase IBI start times [s] (time of the R-peak opening each
+% accepted IBI). In PSD mode they place each IBI at its real closing beat so
+% rejected intervals are interpolated over instead of removed from time.
+ibi_start_times_by_phase = {};
+if numel(varargin) >= 2
+    ibi_start_times_by_phase = varargin{2};
+end
 
 assert(all(isfinite(ibi_tot)) && all(ibi_tot > 0), ...
     'ibi_tot must contain positive finite IBI values in seconds.')
@@ -264,11 +271,18 @@ if label_frequency_analysis == 1
 %% Phase-level PSD / parametric HRV analysis
 elseif label_frequency_analysis == 2
 
+    phase_start_counts = [0, phase_end_counts(1:end-1)];
     for i_phase = 1:n_phases
-        phase_index = uniform_time >= phase_edges_seconds(i_phase) & ...
-                      uniform_time <= phase_edges_seconds(i_phase + 1);
-
-        x_phase = ibi_uniform(phase_index);
+        if ~isempty(ibi_start_times_by_phase)
+            phase_ibi = ibi_tot(phase_start_counts(i_phase)+1 : ...
+                phase_end_counts(i_phase));
+            x_phase = local_real_time_tachogram(phase_ibi, ...
+                ibi_start_times_by_phase{i_phase},fs_hrv);
+        else
+            phase_index = uniform_time >= phase_edges_seconds(i_phase) & ...
+                          uniform_time <= phase_edges_seconds(i_phase + 1);
+            x_phase = ibi_uniform(phase_index);
+        end
 
         if numel(x_phase) < 16
             warning('Phase %d is too short for HRV frequency analysis.',i_phase)
@@ -362,6 +376,24 @@ end
 end
 
 %% Local spectral helper functions
+function x = local_real_time_tachogram(ibi,ibi_start_times,fs_hrv)
+%LOCAL_REAL_TIME_TACHOGRAM Uniform tachogram on the real beat timeline.
+ibi = ibi(:);
+starts = ibi_start_times(:);
+if numel(starts) ~= numel(ibi)
+    error('MultimodalPhysioKit:ECG:InvalidIbiTimes', ...
+        'IBI start times must have one entry per IBI.')
+end
+beat_time = starts + ibi - starts(1);
+if any(diff(beat_time) <= 0)
+    error('MultimodalPhysioKit:ECG:InvalidIbiTimes', ...
+        'IBI beat times must be strictly increasing.')
+end
+uniform_time = (0:1/fs_hrv:beat_time(end))';
+x = interp1([0; beat_time],[ibi(1); ibi],uniform_time,'pchip');
+x = detrend(x,'constant');
+end
+
 function [pxx,f] = local_psd(x,fs,nfft,label_PSD)
 %LOCAL_PSD Estimate one-sided PSD using the requested method.
 % Falls back to a basic FFT-based PSD if toolbox functions are unavailable.

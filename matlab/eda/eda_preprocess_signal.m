@@ -39,7 +39,7 @@ end
 
 down = round(ratio);
 indexes = 1:down:numel(eda);
-edaDownsampled = double(eda(indexes));
+edaDownsampled = antialias_downsample(double(eda(:)),down,100);
 timeDownsampled = double(time(indexes));
 edaFiltered = [];
 if parser.Results.ApplyFilter

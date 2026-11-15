@@ -115,6 +115,7 @@ class ECGProcessor:
 
         features, _ = _extract_ecg_frequency_domain_features(
             time_domain["ibi"],
+            ibi_start_times=time_domain["ibi_times"],
             label_frequency_analysis=self.label_frequency_analysis,
             show_plots=show_plots,
             save_plots=save_plots,
@@ -158,6 +159,7 @@ class ECGProcessor:
 
         frequency_features, frequency_data = _extract_ecg_frequency_domain_features(
             time_domain["ibi"],
+            ibi_start_times=time_domain["ibi_times"],
             label_frequency_analysis=self.label_frequency_analysis,
             show_plots=show_plots,
             save_plots=save_plots,
@@ -911,26 +913,13 @@ def _ecg_time_domain_feature_values(
     ibi_values: np.ndarray,
     control_ibi_flag: np.ndarray,
 ) -> dict[str, float]:
-    diff_ibi_phase = []
-    ibi_counter = 0
-    for index in range(max(control_ibi_flag.size - 1, 0)):
-        if control_ibi_flag[index] != 0 and control_ibi_flag[index + 1] != 0:
-            if ibi_counter + 1 < ibi_values.size:
-                diff_ibi_phase.append(abs(ibi_values[ibi_counter + 1] - ibi_values[ibi_counter]))
-                ibi_counter += 1
-            else:
-                diff_ibi_phase.append(0.0)
-        else:
-            diff_ibi_phase.append(0.0)
-
-    length_adjacent_intervals = _adjacent_interval_lengths(np.asarray(diff_ibi_phase))
-    mean_number_ibi_2_minutes = round(120 * ibi_values.size) / np.sum(ibi_values)
-    if length_adjacent_intervals.size == 0:
-        pnn50 = 0.0
-        pnn50_max = 0.0
-    else:
-        pnn50 = float(np.sum(length_adjacent_intervals) / ibi_values.size)
-        pnn50_max = float(np.max(length_adjacent_intervals) / mean_number_ibi_2_minutes)
+    successive_differences = _successive_ibi_differences(ibi_values, control_ibi_flag)
+    evaluated = np.isfinite(successive_differences)
+    exceeds = evaluated & (np.nan_to_num(successive_differences, nan=0.0) > _PNN50_THRESHOLD_SECONDS)
+    n_evaluated = int(np.count_nonzero(evaluated))
+    pnn50 = float(np.count_nonzero(exceeds) / n_evaluated) if n_evaluated else 0.0
+    expected_ibis_in_2_minutes = 120 * ibi_values.size / np.sum(ibi_values)
+    pnn50_max = float(_longest_true_run(exceeds) / expected_ibis_in_2_minutes)
 
     return {
         "ecg_bpm_mean": float(np.mean(bpm)),
@@ -941,21 +930,38 @@ def _ecg_time_domain_feature_values(
     }
 
 
-def _adjacent_interval_lengths(diff_ibi_phase: np.ndarray) -> np.ndarray:
-    indexes = np.flatnonzero(diff_ibi_phase >= 0.05)
-    if indexes.size < 2:
-        return np.asarray([], dtype=float)
+_PNN50_THRESHOLD_SECONDS = 0.05
 
-    lengths: list[int] = []
-    current_index = 0
-    for index in range(indexes.size - 1):
-        if indexes[index + 1] - indexes[index] == 1 and len(lengths) < current_index + 1:
-            lengths.append(2)
-        elif indexes[index + 1] - indexes[index] == 1:
-            lengths[current_index] += 1
-        elif len(lengths) == current_index + 1:
-            current_index += 1
-    return np.asarray(lengths, dtype=float)
+
+def _successive_ibi_differences(
+    ibi_values: np.ndarray,
+    control_ibi_flag: np.ndarray,
+) -> np.ndarray:
+    """Return |IBI[j+1] - IBI[j]| per flag position, NaN where not adjacent.
+
+    ``ibi_values`` holds the accepted IBIs in the order of their nonzero flags,
+    so the IBI at flag position j is ``ibi_values[accepted_count[j] - 1]``.
+    A difference is defined only when both neighbouring intervals were
+    accepted; pairs that span a rejected interval are not evaluated.
+    """
+
+    accepted = control_ibi_flag != 0
+    accepted_count = np.cumsum(accepted)
+    differences = np.full(max(control_ibi_flag.size - 1, 0), np.nan)
+    for index in range(differences.size):
+        if accepted[index] and accepted[index + 1]:
+            ibi_index = int(accepted_count[index]) - 1
+            if ibi_index + 1 < ibi_values.size:
+                differences[index] = abs(ibi_values[ibi_index + 1] - ibi_values[ibi_index])
+    return differences
+
+
+def _longest_true_run(mask: np.ndarray) -> int:
+    longest = current = 0
+    for value in mask:
+        current = current + 1 if value else 0
+        longest = max(longest, current)
+    return longest
 
 
 def _extract_ecg_frequency_domain_features(
@@ -967,6 +973,7 @@ def _extract_ecg_frequency_domain_features(
     output_dir: str | Path | None = None,
     output_label: str = "ecg",
     stft_context: dict[str, object] | None = None,
+    ibi_start_times: np.ndarray | None = None,
 ) -> tuple[dict[str, float], dict[str, object]]:
     """Extract MATLAB-compatible ECG frequency-domain HRV features."""
 
@@ -989,13 +996,14 @@ def _extract_ecg_frequency_domain_features(
 
     ibi_tot = _validate_ibi(ibi)
 
-    beat_time = np.cumsum(ibi_tot)
+    beat_time = _ibi_beat_times(ibi_tot, ibi_start_times)
     analysis_edges_seconds = np.asarray([0.0, beat_time[-1]], dtype=float)
     analysis_window_seconds = analysis_edges_seconds.reshape(1, 2)
 
     uniform_time, ibi_uniform = _uniform_ibi_tachogram_from_ibi(
         ibi_tot,
         fs_hrv,
+        ibi_start_times=ibi_start_times,
     )
 
     if label_frequency_analysis == 1 and stft_context is not None:
@@ -1055,14 +1063,41 @@ def _validate_ibi(ibi: np.ndarray) -> np.ndarray:
     return array
 
 
+def _ibi_beat_times(
+    ibi_tot: np.ndarray,
+    ibi_start_times: np.ndarray | None,
+) -> np.ndarray:
+    """Return closing-beat times of each IBI, relative to the first R-peak."""
+
+    if ibi_start_times is None:
+        return np.cumsum(ibi_tot)
+    starts = np.asarray(ibi_start_times, dtype=float).reshape(-1)
+    if starts.size != ibi_tot.size:
+        raise ValueError("ibi_start_times must have one entry per IBI")
+    beat_time = starts + ibi_tot - starts[0]
+    if np.any(np.diff(beat_time) <= 0):
+        raise ValueError("IBI beat times must be strictly increasing")
+    return beat_time
+
+
 def _uniform_ibi_tachogram_from_ibi(
     ibi_tot: np.ndarray,
     fs_hrv: float,
+    *,
+    ibi_start_times: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Resample IBIs to a uniform tachogram on a time axis from the first beat.
+
+    With ``ibi_start_times`` (the time of the R-peak that opens each IBI),
+    each IBI is placed at its real closing beat, so rejected intervals leave
+    a gap that is interpolated over instead of being removed from the
+    timeline. Without it, the IBIs are assumed contiguous (cumulative sum).
+    """
+
     if ibi_tot.size < 4:
         raise ValueError("too few IBI samples are available for frequency analysis")
 
-    beat_time = np.cumsum(ibi_tot)
+    beat_time = _ibi_beat_times(ibi_tot, ibi_start_times)
     ibi_time = np.concatenate(([0.0], beat_time))
     ibi_values = np.concatenate(([ibi_tot[0]], ibi_tot))
     uniform_time = np.arange(0, beat_time[-1] + 1 / fs_hrv / 2, 1 / fs_hrv)

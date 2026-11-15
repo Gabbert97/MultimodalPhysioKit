@@ -21,7 +21,7 @@ check_flag = 0;                                                             % [1
 %% Downsample parameters
 ts_new = 1/fs_new;                                                                  % Sampling time [s]
 down = fs/fs_new;
-respiration_downsampled = downsample(respiration,down);
+respiration_downsampled = antialias_downsample(respiration,down,fs_new);
 time_downsampled = downsample(time,down);
 i_phases_downsampled = ceil(i_phases./down);
 

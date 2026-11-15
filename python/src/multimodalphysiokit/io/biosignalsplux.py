@@ -230,7 +230,7 @@ def _convert_biosignalsplux_channel(
         ntc_v = raw * vcc / denominator
         ntc_ohm = (ntc_v * 1e4) / (vcc - ntc_v)
         tmp_k = 1.0 / (a0 + a1 * np.log(ntc_ohm) + a2 * np.log(ntc_ohm) ** 3)
-        return tmp_k - 273.5
+        return tmp_k - 273.15
     if canonical_sensor == "RIP":
         return (raw / denominator - 0.5) * 100
     if canonical_sensor == "EDA":
